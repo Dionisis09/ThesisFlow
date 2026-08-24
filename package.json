@@ -1,0 +1,23 @@
+{
+  "name": "thesisflow",
+  "version": "2.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Thesis management system implemented with Node.js and vanilla JavaScript.",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test": "node --test tests_node/*.test.js",
+    "check": "node --check server.js && node --check node_app/auth.js && node --check node_app/db.js && node --check node_app/pages.js && node --check node_app/routes.js && node --check web/static/js/api.js && node --check web/static/js/login.js && node --check web/static/js/main.js && node --check web/static/js/professor.js && node --check web/static/js/secretariat.js && node --check web/static/js/student.js && node --check web/static/js/ui.js",
+    "db:verify": "node node_app/verify-db.js"
+  },
+  "engines": {
+    "node": ">=22.5"
+  },
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "multer": "^2.0.2"
+  }
+}

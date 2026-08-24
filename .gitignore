@@ -1,0 +1,33 @@
+node_modules/
+out/
+dist/
+tmp/
+
+# Runtime data
+uploads/
+public/uploads/
+
+# Superseded screenshot sets
+docs/live_node/
+docs/live_test_screenshots/
+screenshot web/
+
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+.DS_Store
+Thumbs.db
+~$*.docx
+
+# Local database and safety files
+*.backup.db
+*.db-shm
+*.db-wal

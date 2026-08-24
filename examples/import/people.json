@@ -1,0 +1,42 @@
+{
+  "students": [
+    {
+      "am": "S001",
+      "firstName": "Student001-Updated",
+      "lastName": "Demo",
+      "email": "student001@uni.local"
+    },
+    {
+      "am": "S002",
+      "firstName": "Student002-Updated",
+      "lastName": "Demo",
+      "email": "student002@uni.local"
+    },
+    {
+      "am": "S003",
+      "firstName": "Student003-Updated",
+      "lastName": "Demo",
+      "email": "student003@uni.local"
+    }
+  ],
+  "professors": [
+    {
+      "code": "P001",
+      "firstName": "Professor001-Updated",
+      "lastName": "Demo",
+      "email": "prof001@uni.local"
+    },
+    {
+      "code": "P005",
+      "firstName": "Professor005-Updated",
+      "lastName": "Demo",
+      "email": "prof005@uni.local"
+    },
+    {
+      "code": "P008",
+      "firstName": "Professor008-Updated",
+      "lastName": "Demo",
+      "email": "prof008@uni.local"
+    }
+  ]
+}

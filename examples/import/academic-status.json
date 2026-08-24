@@ -1,0 +1,24 @@
+{
+  "academic_status": [
+    {
+      "am": "S001",
+      "ects": 210,
+      "remaining_courses": 2
+    },
+    {
+      "am": "S002",
+      "ects": 198,
+      "remaining_courses": 3
+    },
+    {
+      "am": "S003",
+      "ects": 225,
+      "remaining_courses": 1
+    },
+    {
+      "am": "S010",
+      "ects": 240,
+      "remaining_courses": 0
+    }
+  ]
+}

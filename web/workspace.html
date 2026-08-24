@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="el">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="csrf-token" content="{{CSRF_TOKEN}}">
+  <title>{{PAGE_TITLE}} - ThesisFlow</title>
+  <link rel="icon" href="/static/favicon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/static/css/app.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="ThesisFlow home"><span class="brand-mark">TF</span><span>ThesisFlow</span></a>
+    <div class="user-menu">
+      <span class="role-pill">{{ROLE_LABEL}}</span><span class="user-email">{{USER_EMAIL}}</span>
+      <a class="button button-ghost button-small" href="/api/auth/logout">Logout</a>
+    </div>
+  </header>
+  <div class="app-shell">
+    <nav class="sidebar" aria-label="Main navigation">{{NAVIGATION}}</nav>
+    <main class="content">
+      <div id="workspace" data-page="{{PAGE_KEY}}">
+        <div class="page-heading"><div><p class="eyebrow">ThesisFlow</p><h1>{{PAGE_TITLE}}</h1></div></div>
+        <div id="page-message" class="message" hidden></div>
+        <section id="page-content" aria-live="polite"><div class="loading-card"><span class="spinner"></span> Loading data...</div></section>
+      </div>
+    </main>
+  </div>
+  <script type="module" src="/static/js/main.js"></script>
+</body>
+</html>
