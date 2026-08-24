@@ -26,6 +26,8 @@ export function createApp() {
     cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 },
   }));
   app.use(loadUser);
+
+  // Apply the same security policy to pages, APIs and static files.
   app.use((req, res, next) => {
     res.set({
       'X-Content-Type-Options': 'nosniff',
@@ -37,6 +39,7 @@ export function createApp() {
   });
   app.use(verifyCsrf);
 
+  // Cache versioned front-end assets longer than uploaded documents.
   app.use('/static', express.static(STATIC_FOLDER, {
     etag: true,
     lastModified: true,

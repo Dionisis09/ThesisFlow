@@ -5,12 +5,6 @@ tmp/
 
 # Runtime data
 uploads/
-public/uploads/
-
-# Superseded screenshot sets
-docs/live_node/
-docs/live_test_screenshots/
-screenshot web/
 
 .env
 .env.local

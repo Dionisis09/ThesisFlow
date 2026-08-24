@@ -41,6 +41,7 @@ function escapeXml(value) {
   })[character]);
 }
 
+// Validate the PDF signature before storing the upload.
 function savePdf(file, uploadFolder) {
   if (!file || file.buffer.subarray(0, 5).toString() !== '%PDF-') return null;
   const filename = `${newId()}.pdf`;
@@ -62,6 +63,7 @@ function csvEscape(value) {
   return /[",\n\r]/.test(raw) ? `"${raw.replaceAll('"', '""')}"` : raw;
 }
 
+// Accept both padded and compact professor codes, for example P002 and P2.
 function normalizeCodes(rawCodes) {
   if (!Array.isArray(rawCodes)) return [];
   const result = [];
@@ -147,6 +149,7 @@ function examRecordHtml(thesis) {
 }
 
 export function registerRoutes(app, upload, uploadFolder) {
+  // Authentication and public presentation feed.
   app.post('/api/auth/login', async (req, res) => {
     const email = text(req.body?.email).toLowerCase();
     const password = String(req.body?.password ?? '');
@@ -217,6 +220,7 @@ export function registerRoutes(app, upload, uploadFolder) {
     res.type('application/xml').send(`<?xml version="1.0" encoding="utf-8"?><presentations>${nodes}</presentations>`);
   });
 
+  // Student profile, committee, files and presentation details.
   app.get('/api/student/thesis', requireRole('STUDENT'), (req, res) => {
     const student = currentStudent(req.user.id);
     if (!student) return res.status(404).json({ error: 'Invalid request.' });
@@ -330,6 +334,7 @@ export function registerRoutes(app, upload, uploadFolder) {
     res.json({ ok: true });
   });
 
+  // Professor topics, assignments, thesis lists and statistics.
   app.get('/api/prof/topics', requireRole('PROFESSOR'), (req, res) => {
     const professor = currentProfessor(req.user.id);
     if (!professor) return res.status(404).json({ error: 'Invalid request.' });
@@ -466,6 +471,7 @@ export function registerRoutes(app, upload, uploadFolder) {
     res.json({ supervised: statsFor(supervised), committee: statsFor(committee) });
   });
 
+  // Committee invitations are read by students and answered by professors.
   app.get('/api/committee/invitations', requireRole('PROFESSOR', 'STUDENT'), (req, res) => {
     if (req.user.role === 'STUDENT') {
       const student = currentStudent(req.user.id);
@@ -548,6 +554,7 @@ export function registerRoutes(app, upload, uploadFolder) {
     res.status(201).json({ id });
   });
 
+  // Thesis state transitions and grading rules are enforced on the server.
   app.post('/api/thesis/transition', requireRole('PROFESSOR', 'SECRETARIAT'), (req, res) => {
     const thesis = one('SELECT * FROM Thesis WHERE id = ?', text(req.body?.thesisId));
     if (!thesis) return res.status(404).json({ error: 'Thesis not found.' });
@@ -648,6 +655,7 @@ export function registerRoutes(app, upload, uploadFolder) {
     res.type('html').send(examRecordHtml(thesisData(thesis.id)));
   });
 
+  // Secretariat management, presentations and data imports.
   app.get('/api/admin/theses', requireRole('SECRETARIAT'), (req, res) => {
     const status = text(req.query.status, 'ALL');
     if (status !== 'ALL' && !STATUSES.includes(status)) return res.status(400).json({ error: 'Invalid status.' });

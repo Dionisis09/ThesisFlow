@@ -27,6 +27,7 @@ export function requirePageRole(role) {
   };
 }
 
+// Only state-changing API requests require a matching session token.
 export function verifyCsrf(req, res, next) {
   if (['GET', 'HEAD', 'OPTIONS'].includes(req.method) || req.path === '/api/auth/login') return next();
   if (!req.path.startsWith('/api/')) return next();

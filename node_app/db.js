@@ -29,6 +29,7 @@ export function run(sql, ...params) {
   return db.prepare(sql).run(...params);
 }
 
+// Keep multi-query workflow changes atomic.
 export function transaction(work) {
   db.exec('BEGIN IMMEDIATE');
   try {
@@ -120,6 +121,7 @@ function gradeData(grade) {
   };
 }
 
+// Build the API view of a thesis from the normalized database tables.
 export function thesisData(thesisOrId, viewerProfessorId = null, detailed = true) {
   const thesis = typeof thesisOrId === 'string'
     ? one('SELECT * FROM Thesis WHERE id = ?', thesisOrId)
@@ -230,6 +232,7 @@ export function addHistory(thesisId, fromStatus, toStatus, actorUserId, note) {
   `, newId(), thesisId, fromStatus, toStatus, actorUserId, note, nowMs());
 }
 
+// These indexes support the filters and joins used by the dashboards.
 export function ensureIndexes() {
   db.exec(`
     CREATE INDEX IF NOT EXISTS Topic_supervisor_status_idx ON Topic(supervisorId, status);

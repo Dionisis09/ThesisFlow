@@ -10,6 +10,7 @@ for (const link of document.querySelectorAll('.sidebar a')) {
   if (link.pathname === window.location.pathname) link.setAttribute('aria-current', 'page');
 }
 
+// The page key selects the renderer for the current user role.
 async function start() {
   if (page.startsWith('student-')) return renderStudent(page);
   if (page.startsWith('prof-')) return renderProfessor(page);

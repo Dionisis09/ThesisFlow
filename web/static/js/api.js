@@ -1,5 +1,6 @@
 const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || '';
 
+// Shared fetch wrapper for JSON bodies, CSRF and API error messages.
 export async function api(url, options = {}) {
   const headers = new Headers(options.headers || {});
   const method = (options.method || 'GET').toUpperCase();
