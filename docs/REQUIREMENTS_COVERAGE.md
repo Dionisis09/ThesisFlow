@@ -1,6 +1,6 @@
 # Assignment requirements coverage
 
-Checked against `Ergastiriaki_Askisi_24-25-1.0.pdf` on 2026-08-24.
+Checked against `Ergastiriaki_Askisi_24-25-1.0.pdf` on 2026-09-12.
 
 ## Technology requirements
 
@@ -32,6 +32,7 @@ The PDF lists the technologies taught in the course; it does not say that PHP an
 | Student profile and committee selection | student profile and invitation APIs |
 | Draft PDF and support links | `/api/upload/thesis-draft`, `/api/student/materials` |
 | In-person or online presentation | date, title, mode, room or meeting URL |
+| Correct examination sequence | supervisor changes `ACTIVE` to `UNDER_EXAM`; student actions unlock afterwards |
 | Public presentation announcements | JSON and XML feeds with date filters |
 | Examination and grading | supervisor opens grading; three criterion-based grades |
 | HTML examination record | `/api/theses/:id/exam-record` |
@@ -48,7 +49,10 @@ The PDF lists the technologies taught in the course; it does not say that PHP an
 npm run check
 npm test
 npm run db:verify
+npm audit --omit=dev
 npm start
 ```
+
+Το ER διάγραμμα βρίσκεται στο `docs/ThesisFlow_ER_Diagram_GR.png`. Η τελική τεχνική αναφορά περιλαμβάνει επίσης καταγραφή πραγματικών HTTP headers μέσω Chrome DevTools Protocol και τεχνικές πηγές.
 
 Το τελικό πακέτο χρειάζεται μόνο τον ενεργό JavaScript κώδικα, τη βάση, τα examples και την τεκμηρίωση. Το `node_modules` μπορεί να παραλειφθεί, επειδή οι εξαρτήσεις αναπαράγονται από το `package-lock.json`.

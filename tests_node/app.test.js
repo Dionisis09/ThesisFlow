@@ -7,7 +7,7 @@ import test, { after } from 'node:test';
 const ROOT = path.resolve(import.meta.dirname, '..');
 const TEMP_FOLDER = fs.mkdtempSync(path.join(os.tmpdir(), 'thesisflow-node-test-'));
 const TEST_DB = path.join(TEMP_FOLDER, 'test.db');
-fs.copyFileSync(path.join(ROOT, 'prisma', 'dev.db'), TEST_DB);
+fs.copyFileSync(path.join(ROOT, 'data', 'dev.db'), TEST_DB);
 process.env.DATABASE_URL = `sqlite:///${TEST_DB.replaceAll('\\', '/')}`;
 process.env.SESSION_SECRET = 'automated-test-secret';
 
@@ -129,10 +129,18 @@ test('complete thesis lifecycle works through the Node.js HTTP API', async () =>
   await api(member3, '/api/committee/invitations', 'PATCH', { id: invitationRows.find((row) => row.code === 'P003').id, action: 'accept' });
   assert.equal(database.one('SELECT status FROM Thesis WHERE id = ?', thesisId).status, 'ACTIVE');
 
+  const prematurePresentation = await rawRequest('/api/student/presentation', {
+    method: 'POST',
+    headers: { Cookie: student.cookie, 'X-CSRF-Token': student.csrf, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date: new Date(Date.now() + 86_400_000).toISOString(), title: 'Too early', mode: 'IN_PERSON', room: 'A1' }),
+  });
+  assert.equal(prematurePresentation.status, 409);
+
+  await api(supervisor, '/api/thesis/transition', 'POST', { thesisId, action: 'to_under_exam' });
+  assert.equal(database.one('SELECT status FROM Thesis WHERE id = ?', thesisId).status, 'UNDER_EXAM');
   await api(student, '/api/student/presentation', 'POST', {
     date: new Date(Date.now() + 86_400_000).toISOString(), title: 'Integration presentation', mode: 'IN_PERSON', room: 'A1',
   });
-  await api(supervisor, '/api/thesis/transition', 'POST', { thesisId, action: 'to_under_exam' });
   await api(supervisor, '/api/thesis/transition', 'POST', { thesisId, action: 'open_grading' });
 
   for (const [session, score] of [[supervisor, 8], [member2, 9], [member3, 10]]) {

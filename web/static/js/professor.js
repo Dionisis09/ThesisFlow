@@ -85,8 +85,8 @@ async function assign() {
     const data = await api(`/api/prof/assign?q=${encodeURIComponent(form.q.value)}`);
     document.querySelector('#assign-results').innerHTML = `<form id="assign-form" class="stack">
       <div class="grid grid-2">
-        <section class="card"><h2>Διαθέσιμοι φοιτητές</h2>${data.students.length ? data.students.map((student) => `<label><span><input style="width:auto" type="radio" name="studentId" value="${escapeHtml(student.id)}"> ${escapeHtml(student.am)} · ${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}</span></label>`).join('') : empty('Δεν βρέθηκαν διαθέσιμοι φοιτητές.')}</section>
-        <section class="card"><h2>Διαθέσιμα θέματα</h2>${data.topics.length ? data.topics.map((topic) => `<label><span><input style="width:auto" type="radio" name="topicId" value="${escapeHtml(topic.id)}"> ${escapeHtml(topic.title)}</span><span class="muted small">${escapeHtml(topic.summary)}</span></label>`).join('') : empty('Δεν βρέθηκαν διαθέσιμα θέματα.')}</section>
+        <section class="card"><h2>Διαθέσιμοι φοιτητές</h2>${data.students.length ? data.students.map((student) => `<label class="choice-row"><input type="radio" name="studentId" value="${escapeHtml(student.id)}"><span>${escapeHtml(student.am)} · ${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}</span></label>`).join('') : empty('Δεν βρέθηκαν διαθέσιμοι φοιτητές.')}</section>
+        <section class="card"><h2>Διαθέσιμα θέματα</h2>${data.topics.length ? data.topics.map((topic) => `<label class="choice-row"><input type="radio" name="topicId" value="${escapeHtml(topic.id)}"><span class="choice-copy"><strong>${escapeHtml(topic.title)}</strong><span class="muted small">${escapeHtml(topic.summary)}</span></span></label>`).join('') : empty('Δεν βρέθηκαν διαθέσιμα θέματα.')}</section>
       </div><div><button class="button button-success">Ανάθεση θέματος</button></div>
     </form>`;
     document.querySelector('#assign-form').addEventListener('submit', async (event) => {
@@ -104,7 +104,7 @@ function thesisActions(thesis) {
   if (thesis.role === 'SUPERVISOR' && thesis.status === 'UNDER_ASSIGNMENT') {
     actions.push(`<button class="button button-danger button-small" data-action="cancel-initial">Αναίρεση ανάθεσης</button>`);
   }
-  if (thesis.role === 'SUPERVISOR' && thesis.status === 'ACTIVE' && thesis.presentation) {
+  if (thesis.role === 'SUPERVISOR' && thesis.status === 'ACTIVE') {
     actions.push(`<button class="button button-primary button-small" data-action="under-exam">Μετάβαση σε υπό εξέταση</button>`);
   }
   if (thesis.role === 'SUPERVISOR' && thesis.canSupervisorCancel) {
@@ -137,11 +137,12 @@ function thesisCard(thesis) {
     ${thesisSummary(thesis)}
     <div class="meta-list">
       <span><strong>Μέλη τριμελούς:</strong> ${escapeHtml(members)}</span>
-      <span><strong>Παρουσίαση:</strong> ${thesis.presentation ? `${formatDate(thesis.presentation.date)} · ${escapeHtml(thesis.presentation.room)}` : '—'}</span>
+      <span><strong>Ανακοίνωση παρουσίασης:</strong> ${thesis.presentation ? `${escapeHtml(thesis.presentation.title)} · ${formatDate(thesis.presentation.date)} · ${escapeHtml(thesis.presentation.room)}` : '—'}</span>
       <span><strong>Χρόνος από ανάθεση:</strong> ${escapeHtml(thesis.elapsedDays)} ημέρες</span>
       <span><strong>Τελικός βαθμός:</strong> ${thesis.finalGrade ?? '—'}</span>
       ${thesis.draftUrl ? `<span><a href="${escapeHtml(thesis.draftUrl)}" target="_blank">Πρόχειρο PDF</a></span>` : ''}
       ${thesis.finalRepositoryUrl ? `<span><a href="${escapeHtml(thesis.finalRepositoryUrl)}" target="_blank" rel="noreferrer">Τελικό κείμενο στη Νημερτή</a></span>` : ''}
+      ${['UNDER_EXAM', 'COMPLETED'].includes(thesis.status) && thesis.grades?.length ? `<span><a href="/api/theses/${escapeHtml(thesis.id)}/exam-record" target="_blank">Πρακτικό εξέτασης</a></span>` : ''}
     </div>
     <div class="inline section">${thesisActions(thesis)}</div>
     ${thesis.status === 'UNDER_ASSIGNMENT' ? `<details class="section"><summary>Προσκλήσεις τριμελούς</summary>${invitations}</details>` : ''}

@@ -140,11 +140,15 @@ async function invitations() {
 async function upload() {
   const { thesis } = await api('/api/student/thesis');
   if (!thesis) { content().innerHTML = empty('Δεν υπάρχει διπλωματική.'); return; }
+  if (thesis.status !== 'UNDER_EXAM') {
+    content().innerHTML = empty('Τα αρχεία και οι σύνδεσμοι ενεργοποιούνται όταν ο επιβλέπων θέσει τη διπλωματική σε κατάσταση «Υπό εξέταση».');
+    return;
+  }
   content().innerHTML = `
     <div class="grid grid-2">
       <form id="draft-form" class="card stack">
         <h2>Πρόχειρο κείμενο</h2>
-        <p class="muted small">Έγκυρο PDF έως 16 MB. Επιτρέπεται σε ενεργή ή υπό εξέταση διπλωματική.</p>
+        <p class="muted small">Έγκυρο PDF έως 16 MB για διπλωματική υπό εξέταση.</p>
         <input name="file" type="file" accept="application/pdf" required>
         <button class="button button-primary">Ανέβασμα PDF</button>
         ${thesis.draftUrl ? `<a href="${escapeHtml(thesis.draftUrl)}" target="_blank">Τρέχον πρόχειρο</a>` : ''}
@@ -175,6 +179,10 @@ async function upload() {
 async function presentation() {
   const { thesis } = await api('/api/student/thesis');
   if (!thesis) { content().innerHTML = empty('Δεν υπάρχει διπλωματική.'); return; }
+  if (thesis.status !== 'UNDER_EXAM') {
+    content().innerHTML = empty('Τα στοιχεία παρουσίασης ενεργοποιούνται όταν ο επιβλέπων θέσει τη διπλωματική σε κατάσταση «Υπό εξέταση».');
+    return;
+  }
   const item = thesis.presentation || {};
   content().innerHTML = `<form id="presentation-form" class="card form-grid">
     <label>Ημερομηνία και ώρα<input name="date" type="datetime-local" value="${toLocalInput(item.date)}" required></label>

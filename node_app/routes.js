@@ -281,7 +281,7 @@ export function registerRoutes(app, upload, uploadFolder) {
     const student = currentStudent(req.user.id);
     const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
     if (!thesis) return res.status(400).json({ error: 'Invalid request.' });
-    if (!['ACTIVE', 'UNDER_EXAM'].includes(thesis.status)) return res.status(409).json({ error: 'Invalid request.' });
+    if (thesis.status !== 'UNDER_EXAM') return res.status(409).json({ error: 'Thesis must be under examination.' });
     const url = savePdf(req.file, uploadFolder);
     if (!url) return res.status(400).json({ error: 'Invalid request.' });
     run('UPDATE Thesis SET draftUrl = ?, updatedAt = ? WHERE id = ?', url, nowMs(), thesis.id);
@@ -292,6 +292,7 @@ export function registerRoutes(app, upload, uploadFolder) {
     const student = currentStudent(req.user.id);
     const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
     if (!thesis) return res.status(400).json({ error: 'Invalid request.' });
+    if (thesis.status !== 'UNDER_EXAM') return res.status(409).json({ error: 'Thesis must be under examination.' });
     const label = text(req.body?.label);
     const url = text(req.body?.url);
     if (!label || label.length > 120 || !isHttpUrl(url)) return res.status(400).json({ error: 'Invalid request.' });
@@ -304,7 +305,7 @@ export function registerRoutes(app, upload, uploadFolder) {
     const student = currentStudent(req.user.id);
     const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
     if (!thesis) return res.status(400).json({ error: 'Invalid request.' });
-    if (!['ACTIVE', 'UNDER_EXAM'].includes(thesis.status)) return res.status(409).json({ error: 'Invalid request.' });
+    if (thesis.status !== 'UNDER_EXAM') return res.status(409).json({ error: 'Thesis must be under examination.' });
     const date = datetimeToMs(req.body?.date);
     const title = text(req.body?.title);
     const mode = text(req.body?.mode, 'IN_PERSON').toUpperCase();
@@ -568,9 +569,7 @@ export function registerRoutes(app, upload, uploadFolder) {
 
     const action = text(req.body?.action);
     if (action === 'to_under_exam') {
-      if (thesis.status !== 'ACTIVE' || !one('SELECT id FROM PresentationDetails WHERE thesisId = ?', thesis.id)) {
-        return res.status(409).json({ error: 'An active thesis with presentation details is required.' });
-      }
+      if (thesis.status !== 'ACTIVE') return res.status(409).json({ error: 'Thesis must be active.' });
       transaction(() => {
         run('UPDATE Thesis SET status = ?, updatedAt = ? WHERE id = ?', 'UNDER_EXAM', nowMs(), thesis.id);
         addHistory(thesis.id, thesis.status, 'UNDER_EXAM', req.user.id, 'Supervisor moved thesis to examination.');
@@ -687,9 +686,7 @@ export function registerRoutes(app, upload, uploadFolder) {
     }
 
     if (action === 'to_under_exam') {
-      if (thesis.status !== 'ACTIVE' || !one('SELECT id FROM PresentationDetails WHERE thesisId = ?', thesis.id)) {
-        return res.status(409).json({ error: 'An active thesis with presentation details is required.' });
-      }
+      if (thesis.status !== 'ACTIVE') return res.status(409).json({ error: 'Thesis must be active.' });
       transaction(() => {
         run(`UPDATE Thesis SET status = 'UNDER_EXAM', updatedAt = ? WHERE id = ?`, nowMs(), thesis.id);
         addHistory(thesis.id, thesis.status, 'UNDER_EXAM', req.user.id, 'Secretariat moved thesis to examination.');

@@ -7,9 +7,9 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 function databasePath() {
   const configured = (process.env.DATABASE_URL || '').trim();
-  if (configured.startsWith('file:')) return path.resolve(ROOT, 'prisma', configured.slice(5));
+  if (configured.startsWith('file:')) return path.resolve(ROOT, 'data', configured.slice(5));
   if (configured.startsWith('sqlite:///')) return path.resolve(configured.slice(10));
-  return path.join(ROOT, 'prisma', 'dev.db');
+  return path.join(ROOT, 'data', 'dev.db');
 }
 
 export const db = new DatabaseSync(databasePath());

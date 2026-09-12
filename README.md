@@ -13,7 +13,7 @@ npm start
 
 Άνοιξε το `http://127.0.0.1:5000`.
 
-Η έτοιμη βάση βρίσκεται στο `prisma/dev.db`. Για διαφορετικό αρχείο βάσης χρησιμοποίησε το `DATABASE_URL` όπως φαίνεται στο `.env.example`. Σε περιβάλλον παραγωγής πρέπει να οριστεί ισχυρό `SESSION_SECRET`.
+Η έτοιμη βάση βρίσκεται στο `data/dev.db`. Για διαφορετικό αρχείο βάσης χρησιμοποίησε το `DATABASE_URL` όπως φαίνεται στο `.env.example`. Σε περιβάλλον παραγωγής πρέπει να οριστεί ισχυρό `SESSION_SECRET`.
 
 ## Λογαριασμοί παρουσίασης
 
@@ -38,8 +38,16 @@ npm run db:verify
 - `node_app/db.js`: πρόσβαση SQLite, μετατροπή δεδομένων και indexes.
 - `node_app/auth.js`: sessions, ρόλοι και CSRF.
 - `node_app/pages.js`: δημιουργία των HTML σελίδων ανά ρόλο.
+- `data/dev.db`: έτοιμη βάση SQLite με δεδομένα επίδειξης.
 - `web/static/js`: κώδικας browser και AJAX.
 - `web/static/css/app.css`: εμφάνιση και responsive layout.
 - `tests_node`: integration tests.
 
-Δες την [κάλυψη απαιτήσεων](docs/REQUIREMENTS_COVERAGE.md) και την [αναφορά ελέγχου](docs/NODE_VALIDATION_REPORT.md).
+## Υλικό παρουσίασης
+
+- [Πλήρης τεχνική αναφορά](docs/ThesisFlow_Technical_Report_GR.docx)
+- [Κάλυψη απαιτήσεων](docs/REQUIREMENTS_COVERAGE.md)
+- [Οδηγός προετοιμασίας εξέτασης](docs/PRESENTATION_GUIDE_GR.md)
+- [Αναφορά ελέγχου](docs/NODE_VALIDATION_REPORT.md)
+- [Διάγραμμα περιπτώσεων χρήσης](docs/ThesisFlow_Use_Case_Diagram_GR.png)
+- [Διάγραμμα οντοτήτων και σχέσεων](docs/ThesisFlow_ER_Diagram_GR.png)
