@@ -131,6 +131,7 @@ function thesisActions(thesis) {
 
 function thesisCard(thesis) {
   const members = thesis.members?.map((member) => member.fullName).join(', ') || 'Δεν έχει συμπληρωθεί';
+  const gradeCount = thesis.grades?.filter((item) => item.value >= 0 && item.value <= 10).length || 0;
   const invitations = thesis.invitations?.length ? `<div class="table-wrap"><table><thead><tr><th>Πρόσκληση</th><th>Κατάσταση</th><th>Απάντηση</th></tr></thead><tbody>${thesis.invitations.map((item) => `<tr><td>${escapeHtml(item.professor.fullName)}<br><span class="muted small">${formatDate(item.createdAt)}</span></td><td>${escapeHtml(item.status)}</td><td>${formatDate(item.respondedAt)}</td></tr>`).join('')}</tbody></table></div>` : empty('Δεν υπάρχουν προσκλήσεις.');
   const history = thesis.history?.length ? `<ul class="timeline">${thesis.history.map((item) => `<li><strong>${escapeHtml(item.toStatus)}</strong><br><span class="muted small">${formatDate(item.createdAt)} · ${escapeHtml(item.note || '')}</span></li>`).join('')}</ul>` : empty('Δεν υπάρχει ιστορικό.');
   return `<article class="card" data-thesis="${escapeHtml(thesis.id)}">
@@ -142,7 +143,7 @@ function thesisCard(thesis) {
       <span><strong>Τελικός βαθμός:</strong> ${thesis.finalGrade ?? '—'}</span>
       ${thesis.draftUrl ? `<span><a href="${escapeHtml(thesis.draftUrl)}" target="_blank">Πρόχειρο PDF</a></span>` : ''}
       ${thesis.finalRepositoryUrl ? `<span><a href="${escapeHtml(thesis.finalRepositoryUrl)}" target="_blank" rel="noreferrer">Τελικό κείμενο στη Νημερτή</a></span>` : ''}
-      ${['UNDER_EXAM', 'COMPLETED'].includes(thesis.status) && thesis.grades?.length ? `<span><a href="/api/theses/${escapeHtml(thesis.id)}/exam-record" target="_blank">Πρακτικό εξέτασης</a></span>` : ''}
+      ${['UNDER_EXAM', 'COMPLETED'].includes(thesis.status) && gradeCount === 3 ? `<span><a href="/api/theses/${escapeHtml(thesis.id)}/exam-record" target="_blank">Πρακτικό εξέτασης</a></span>` : ''}
     </div>
     <div class="inline section">${thesisActions(thesis)}</div>
     ${thesis.status === 'UNDER_ASSIGNMENT' ? `<details class="section"><summary>Προσκλήσεις τριμελούς</summary>${invitations}</details>` : ''}

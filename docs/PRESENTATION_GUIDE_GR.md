@@ -128,6 +128,7 @@ Browser: HTML + CSS + JavaScript
 - Κριτήρια/σχόλια: `web/static/js/professor.js:120-127` και `web/static/js/professor.js:201-204`.
 - Έλεγχοι συμμετοχής και κατάστασης: `node_app/routes.js:603-625`.
 - Αποθήκευση και τελικός μέσος τριών βαθμών: `node_app/routes.js:626-641`.
+- Το πρακτικό εμφανίζεται μόνο μετά από τρεις έγκυρους βαθμούς: UI `web/static/js/professor.js:146`, server `node_app/routes.js:643-656`.
 - Τι κάνει: κάθε μέλος δίνει τρία κριτήρια 0–10. Τελικός βαθμός εμφανίζεται όταν υπάρχουν τρεις έγκυρες βαθμολογίες.
 
 ## Use cases Φοιτητή
@@ -138,7 +139,7 @@ Browser: HTML + CSS + JavaScript
 - UI θέματος, κατάστασης, επιτροπής, χρόνου, αρχείων, βαθμών και ιστορικού: `web/static/js/student.js:33-72`.
 - API: `node_app/routes.js:224-231`.
 - Συγκέντρωση σχετικών πινάκων: `node_app/db.js:125-225`.
-- Πρακτικό εξέτασης: link `web/static/js/student.js:68`, παραγωγή `node_app/routes.js:100-148`.
+- Πρακτικό εξέτασης μετά από τρεις βαθμούς: link `web/static/js/student.js:69`, παραγωγή `node_app/routes.js:100-148`, έλεγχος `node_app/routes.js:643-656`.
 - Τι κάνει: βρίσκει τη διπλωματική του χρήστη από το session, χωρίς να δέχεται `studentId` από τον browser.
 
 ### S2. Προσωπικά στοιχεία
@@ -207,20 +208,20 @@ Browser: HTML + CSS + JavaScript
 
 ### A3a. Επίσημη ανάθεση
 
-- Φόρμα πρακτικού ΓΣ: `web/static/js/secretariat.js:21-29` και `web/static/js/secretariat.js:80-84`.
-- Action `record_assignment`: `node_app/routes.js:676-686`.
+- Φόρμα πρακτικού ΓΣ: `web/static/js/secretariat.js:21-28` και `web/static/js/secretariat.js:79-83`.
+- Action `record_assignment`: `node_app/routes.js:677-687`.
 - Τι κάνει: αποθηκεύει αριθμό/έτος ΓΣ και τον επίσημο χρόνο ανάθεσης.
 
 ### A3b. Ακύρωση
 
-- UI αριθμού/έτους/λόγου: `web/static/js/secretariat.js:31-36` και `web/static/js/secretariat.js:85-90`.
-- Action `cancel`: `node_app/routes.js:700-711`.
+- UI αριθμού/έτους/λόγου: `web/static/js/secretariat.js:30-35` και `web/static/js/secretariat.js:84-89`.
+- Action `cancel`: `node_app/routes.js:690-701`.
 - Τι κάνει: ακυρώνει `ACTIVE` ή `UNDER_EXAM`, αποθηκεύει απόφαση και ιστορικό.
 
 ### A3c. Περάτωση
 
-- Κουμπί μετά από 3 βαθμούς και Νημερτή: `web/static/js/secretariat.js:38-40`.
-- Action `complete`: `node_app/routes.js:714-723`.
+- Κουμπί μετά από 3 βαθμούς και Νημερτή: `web/static/js/secretariat.js:37-39`.
+- Action `complete`: `node_app/routes.js:704-715`.
 - Τι κάνει: ο server επαληθεύει `UNDER_EXAM`, τρεις βαθμούς και URL πριν θέσει `COMPLETED`.
 
 ## Δημόσιο use case

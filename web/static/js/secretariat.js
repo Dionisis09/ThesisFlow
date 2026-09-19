@@ -26,7 +26,6 @@ function managementControls(thesis) {
       <input class="compact-input" name="gsYear" type="number" value="${escapeHtml(thesis.assignmentGsYear || currentYear)}" required>
       <button class="button button-secondary button-small">Καταχώριση ανάθεσης</button>
     </form>`);
-    blocks.push('<button class="button button-primary button-small" data-action="to_under_exam">Μετάβαση σε υπό εξέταση</button>');
   }
   if (['ACTIVE', 'UNDER_EXAM'].includes(thesis.status)) {
     blocks.push(`<details><summary>Ακύρωση διπλωματικής</summary><form data-role="cancel" class="form-grid section">

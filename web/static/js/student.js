@@ -44,7 +44,8 @@ async function studentThesis() {
   const materials = thesis.materials?.length
     ? `<ul>${thesis.materials.map((item) => `<li><a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.label)}</a></li>`).join('')}</ul>`
     : '<span class="muted">—</span>';
-  const repositoryForm = thesis.status === 'UNDER_EXAM' && thesis.grades?.filter((item) => item.value >= 0 && item.value <= 10).length === 3 && !thesis.finalRepositoryUrl
+  const gradeCount = thesis.grades?.filter((item) => item.value >= 0 && item.value <= 10).length || 0;
+  const repositoryForm = thesis.status === 'UNDER_EXAM' && gradeCount === 3 && !thesis.finalRepositoryUrl
     ? `<form id="repository-form" class="inline section"><input class="compact-input" name="url" type="url" placeholder="Σύνδεσμος Νημερτή" required><button class="button button-primary">Καταχώριση τελικού κειμένου</button></form>`
     : '';
 
@@ -65,7 +66,7 @@ async function studentThesis() {
       <div class="card"><h2 class="section-heading">Τριμελής επιτροπή</h2><ul>${members.map((member, index) => `<li>${escapeHtml(member.fullName)} ${index === 0 ? '(επιβλέπων)' : ''}</li>`).join('')}</ul></div>
       <div class="card"><h2 class="section-heading">Παρουσίαση</h2>${thesis.presentation ? `<p><strong>${formatDate(thesis.presentation.date)}</strong></p><p>${escapeHtml(thesis.presentation.mode === 'ONLINE' ? 'Διαδικτυακά' : thesis.presentation.room)}</p>` : '<p class="muted">Δεν έχουν οριστεί στοιχεία.</p>'}</div>
     </section>
-    <section class="card section"><h2 class="section-heading">Βαθμολογία</h2>${gradeRows(thesis)}${thesis.grades?.length ? `<p class="section"><a href="/api/theses/${escapeHtml(thesis.id)}/exam-record" target="_blank">Πρακτικό εξέτασης</a></p>` : ''}</section>
+    <section class="card section"><h2 class="section-heading">Βαθμολογία</h2>${gradeRows(thesis)}${gradeCount === 3 ? `<p class="section"><a href="/api/theses/${escapeHtml(thesis.id)}/exam-record" target="_blank">Πρακτικό εξέτασης</a></p>` : ''}</section>
     <section class="grid grid-2 section">
       <div class="card"><h2 class="section-heading">Ιστορικό</h2>${history}</div>
       <div class="card"><h2 class="section-heading">Υποστηρικτικό υλικό</h2>${materials}</div>
@@ -148,7 +149,7 @@ async function upload() {
     <div class="grid grid-2">
       <form id="draft-form" class="card stack">
         <h2>Πρόχειρο κείμενο</h2>
-        <p class="muted small">Έγκυρο PDF έως 16 MB για διπλωματική υπό εξέταση.</p>
+        <p class="muted small">Έγκυρο PDF έως 12 MB για διπλωματική υπό εξέταση.</p>
         <input name="file" type="file" accept="application/pdf" required>
         <button class="button button-primary">Ανέβασμα PDF</button>
         ${thesis.draftUrl ? `<a href="${escapeHtml(thesis.draftUrl)}" target="_blank">Τρέχον πρόχειρο</a>` : ''}

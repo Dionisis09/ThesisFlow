@@ -136,8 +136,18 @@ test('complete thesis lifecycle works through the Node.js HTTP API', async () =>
   });
   assert.equal(prematurePresentation.status, 409);
 
+  const secretariatTransition = await rawRequest('/api/admin/theses', {
+    method: 'PATCH',
+    headers: { Cookie: secretariat.cookie, 'X-CSRF-Token': secretariat.csrf, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ thesisId, action: 'to_under_exam' }),
+  });
+  assert.equal(secretariatTransition.status, 400);
+  assert.equal(database.one('SELECT status FROM Thesis WHERE id = ?', thesisId).status, 'ACTIVE');
+
   await api(supervisor, '/api/thesis/transition', 'POST', { thesisId, action: 'to_under_exam' });
   assert.equal(database.one('SELECT status FROM Thesis WHERE id = ?', thesisId).status, 'UNDER_EXAM');
+  const prematureRecord = await rawRequest(`/api/theses/${thesisId}/exam-record`, { headers: { Cookie: student.cookie } });
+  assert.equal(prematureRecord.status, 409);
   await api(student, '/api/student/presentation', 'POST', {
     date: new Date(Date.now() + 86_400_000).toISOString(), title: 'Integration presentation', mode: 'IN_PERSON', room: 'A1',
   });
@@ -148,6 +158,9 @@ test('complete thesis lifecycle works through the Node.js HTTP API', async () =>
       thesisId, comments: 'Automated integration grade', criteria: { written: score, presentation: score, overall: score },
     });
   }
+  const examRecord = await rawRequest(`/api/theses/${thesisId}/exam-record`, { headers: { Cookie: student.cookie } });
+  assert.equal(examRecord.status, 200);
+  assert.match(await examRecord.text(), /Final grade/);
   await api(student, '/api/student/final-repository', 'POST', { url: 'https://nemertes.library.example/thesis-test' });
   await api(secretariat, '/api/admin/theses', 'PATCH', { thesisId, action: 'complete' });
 

@@ -651,6 +651,8 @@ export function registerRoutes(app, upload, uploadFolder) {
       const professor = currentProfessor(req.user.id);
       if (!professor || !validParticipant(thesis.id, professor.id)) return res.status(403).json({ error: 'Access denied.' });
     }
+    const gradeCount = one('SELECT COUNT(*) AS count FROM Grade WHERE thesisId = ? AND value BETWEEN 0 AND 10', thesis.id).count;
+    if (gradeCount !== 3) return res.status(409).json({ error: 'The examination record requires three valid grades.' });
     res.type('html').send(examRecordHtml(thesisData(thesis.id)));
   });
 
@@ -669,7 +671,7 @@ export function registerRoutes(app, upload, uploadFolder) {
     if (!thesis) return res.status(404).json({ error: 'Thesis not found.' });
     let action = text(req.body?.action);
     if (!action && req.body?.status) {
-      action = ({ ACTIVE: 'record_assignment', CANCELED: 'cancel', COMPLETED: 'complete', UNDER_EXAM: 'to_under_exam' })[req.body.status] || '';
+      action = ({ ACTIVE: 'record_assignment', CANCELED: 'cancel', COMPLETED: 'complete' })[req.body.status] || '';
     }
 
     if (action === 'record_assignment') {
@@ -681,15 +683,6 @@ export function registerRoutes(app, upload, uploadFolder) {
         run(`UPDATE Thesis SET assignmentGsNumber = ?, assignmentGsYear = ?, officialAssignedAt = COALESCE(officialAssignedAt, ?)
              WHERE id = ?`, number, year, nowMs(), thesis.id);
         run('INSERT INTO ImportLog (id, type, payload, createdAt) VALUES (?, ?, ?, ?)', newId(), 'GS_ASSIGNMENT', JSON.stringify({ thesisId: thesis.id, number, year }), nowMs());
-      });
-      return res.json({ ok: true });
-    }
-
-    if (action === 'to_under_exam') {
-      if (thesis.status !== 'ACTIVE') return res.status(409).json({ error: 'Thesis must be active.' });
-      transaction(() => {
-        run(`UPDATE Thesis SET status = 'UNDER_EXAM', updatedAt = ? WHERE id = ?`, nowMs(), thesis.id);
-        addHistory(thesis.id, thesis.status, 'UNDER_EXAM', req.user.id, 'Secretariat moved thesis to examination.');
       });
       return res.json({ ok: true });
     }
