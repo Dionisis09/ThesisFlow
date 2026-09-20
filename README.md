@@ -32,10 +32,17 @@ npm run db:export
 
 Τα tests χρησιμοποιούν απομονωμένο αντίγραφο της βάσης και ελέγχουν σύνδεση, ρόλους, CSRF, δημόσια JSON/XML feeds, caching, indexes και ολόκληρο τον κύκλο ζωής μιας διπλωματικής.
 
-## Δομή κώδικα
+## Δομή project
 
 - `server.js`: ρύθμιση Express, static αρχεία και HTTP headers.
-- `node_app/routes.js`: APIs και επιχειρησιακή ροή.
+- `node_app/routes.js`: ένα μικρό κεντρικό σημείο που συνδέει όλα τα APIs.
+- `node_app/routes/auth.js`: σύνδεση και αποσύνδεση.
+- `node_app/routes/professor.js`: θέματα, αναθέσεις, προσκλήσεις, βαθμοί και μεταβάσεις επιβλέποντα.
+- `node_app/routes/student.js`: προφίλ, τριμελής, αρχεία, παρουσίαση και τελικό αποθετήριο.
+- `node_app/routes/secretariat.js`: διαχείριση διπλωματικών, παρουσιάσεων και εισαγωγών.
+- `node_app/routes/public.js`: δημόσιο JSON/XML feed παρουσιάσεων.
+- `node_app/routes/exam-record.js`: παραγωγή του πρακτικού εξέτασης.
+- `node_app/routes/helpers.js`: μικρές κοινές συναρτήσεις χωρίς επιχειρησιακές αποφάσεις.
 - `node_app/db.js`: πρόσβαση SQLite, μετατροπή δεδομένων και indexes.
 - `node_app/auth.js`: sessions, ρόλοι και CSRF.
 - `node_app/pages.js`: δημιουργία των HTML σελίδων ανά ρόλο.
@@ -45,6 +52,10 @@ npm run db:export
 - `web/static/js`: κώδικας browser και AJAX.
 - `web/static/css/app.css`: εμφάνιση και responsive layout.
 - `tests_node`: integration tests.
+
+Η βασική ροή ανά endpoint είναι: ο browser καλεί το API με `fetch`, το αντίστοιχο
+αρχείο στο `node_app/routes/` ελέγχει ρόλο και δεδομένα, το `node_app/db.js`
+εκτελεί το SQL και η απάντηση επιστρέφει ως JSON ή HTML.
 
 ## Υλικό παρουσίασης
 

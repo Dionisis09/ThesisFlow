@@ -1,5 +1,5 @@
-import { api } from './api.js';
-import { STATUS_LABELS, dashboardCard, dashboardHero, empty, escapeHtml, formatDate, showMessage, statusBadge, thesisSummary } from './ui.js';
+import { api } from './api.js?v=20260920-1';
+import { STATUS_LABELS, dashboardCard, dashboardHero, empty, escapeHtml, formatDate, showMessage, statusBadge, thesisSummary } from './ui.js?v=20260920-1';
 
 const content = () => document.querySelector('#page-content');
 
@@ -21,6 +21,65 @@ function dashboard() {
         <span class="dashboard-card-copy"><strong>Εξαγωγές</strong><span class="muted">Κατέβασε τη λίστα διπλωματικών.</span><span class="dashboard-export-links"><a href="/api/prof/theses/export">CSV</a><a href="/api/prof/theses/export.json">JSON</a></span></span>
       </div>
     </div>`;
+}
+
+async function createTopic(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    await api('/api/prof/topics', {
+      method: 'POST',
+      body: { title: form.title.value, summary: form.summary.value },
+    });
+    showMessage('Το θέμα δημιουργήθηκε.');
+    await topics();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+async function handleTopicAction(event) {
+  const action = event.target.dataset.action;
+  if (!action) return;
+
+  const card = event.currentTarget;
+  try {
+    if (action === 'toggle') {
+      await api(`/api/prof/topics/${card.dataset.topic}`, {
+        method: 'PATCH',
+        body: { toggle: true },
+      });
+    }
+    if (action === 'upload') {
+      const file = card.querySelector('[data-role="pdf"]').files[0];
+      if (!file) throw new Error('Επιλέξτε αρχείο PDF.');
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('topicId', card.dataset.topic);
+      await api('/api/upload/topic-description', { method: 'POST', body: formData });
+    }
+    showMessage('Η αλλαγή αποθηκεύτηκε.');
+    await topics();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+async function updateTopic(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const card = form.closest('[data-topic]');
+  try {
+    await api(`/api/prof/topics/${card.dataset.topic}`, {
+      method: 'PATCH',
+      body: { title: form.title.value, summary: form.summary.value },
+    });
+    showMessage('Το θέμα ενημερώθηκε.');
+    await topics();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
 }
 
 async function topics() {
@@ -47,56 +106,58 @@ async function topics() {
       </article>`).join('') : empty('Δεν υπάρχουν θέματα.')}
     </section>`;
 
-  document.querySelector('#topic-form').addEventListener('submit', async (event) => {
-    event.preventDefault(); const form = event.currentTarget;
-    try { await api('/api/prof/topics', { method: 'POST', body: { title: form.title.value, summary: form.summary.value } }); showMessage('Το θέμα δημιουργήθηκε.'); await topics(); }
-    catch (error) { showMessage(error.message, 'error'); }
+  document.querySelector('#topic-form').addEventListener('submit', createTopic);
+  content().querySelectorAll('[data-topic]').forEach((card) => {
+    card.addEventListener('click', handleTopicAction);
   });
-  content().querySelectorAll('[data-topic]').forEach((card) => card.addEventListener('click', async (event) => {
-    const action = event.target.dataset.action;
-    if (!action) return;
-    try {
-      if (action === 'toggle') await api(`/api/prof/topics/${card.dataset.topic}`, { method: 'PATCH', body: { toggle: true } });
-      if (action === 'upload') {
-        const file = card.querySelector('[data-role="pdf"]').files[0];
-        if (!file) throw new Error('Επιλέξτε αρχείο PDF.');
-        const formData = new FormData(); formData.append('file', file); formData.append('topicId', card.dataset.topic);
-        await api('/api/upload/topic-description', { method: 'POST', body: formData });
-      }
-      showMessage('Η αλλαγή αποθηκεύτηκε.'); await topics();
-    } catch (error) { showMessage(error.message, 'error'); }
-  }));
-  content().querySelectorAll('[data-role="edit-topic"]').forEach((form) => form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const card = form.closest('[data-topic]');
-    try {
-      await api(`/api/prof/topics/${card.dataset.topic}`, { method: 'PATCH', body: { title: form.title.value, summary: form.summary.value } });
-      showMessage('Το θέμα ενημερώθηκε.'); await topics();
-    } catch (error) { showMessage(error.message, 'error'); }
-  }));
+  content().querySelectorAll('[data-role="edit-topic"]').forEach((form) => {
+    form.addEventListener('submit', updateTopic);
+  });
+}
+
+async function submitAssignment(event, reloadChoices) {
+  event.preventDefault();
+  const formData = new FormData(event.currentTarget);
+  try {
+    await api('/api/prof/assign', {
+      method: 'POST',
+      body: {
+        studentId: formData.get('studentId'),
+        topicId: formData.get('topicId'),
+      },
+    });
+    showMessage('Η αρχική ανάθεση ολοκληρώθηκε.');
+    await reloadChoices();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+async function renderAssignmentChoices(searchForm) {
+  const query = encodeURIComponent(searchForm.q.value);
+  const data = await api(`/api/prof/assign?q=${query}`);
+  document.querySelector('#assign-results').innerHTML = `<form id="assign-form" class="stack">
+      <div class="grid grid-2">
+        <section class="card"><h2>Διαθέσιμοι φοιτητές</h2>${data.students.length ? data.students.map((student) => `<label class="choice-row"><input type="radio" name="studentId" value="${escapeHtml(student.id)}"><span>${escapeHtml(student.am)} · ${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}</span></label>`).join('') : empty('Δεν βρέθηκαν διαθέσιμοι φοιτητές.')}</section>
+        <section class="card"><h2>Διαθέσιμα θέματα</h2>${data.topics.length ? data.topics.map((topic) => `<label class="choice-row"><input type="radio" name="topicId" value="${escapeHtml(topic.id)}"><span class="choice-copy"><strong>${escapeHtml(topic.title)}</strong><span class="muted small">${escapeHtml(topic.summary)}</span></span></label>`).join('') : empty('Δεν βρέθηκαν διαθέσιμα θέματα.')}</section>
+      </div><div><button class="button button-success">Ανάθεση θέματος</button></div>
+    </form>`;
+  document.querySelector('#assign-form').addEventListener('submit', (event) => {
+    submitAssignment(event, () => renderAssignmentChoices(searchForm));
+  });
 }
 
 async function assign() {
   content().innerHTML = `<form id="search-form" class="card inline">
     <input class="compact-input" name="q" placeholder="ΑΜ, όνομα ή θέμα"><button class="button button-secondary">Αναζήτηση</button>
   </form><div id="assign-results" class="section"></div>`;
-  const renderResults = async () => {
-    const form = document.querySelector('#search-form');
-    const data = await api(`/api/prof/assign?q=${encodeURIComponent(form.q.value)}`);
-    document.querySelector('#assign-results').innerHTML = `<form id="assign-form" class="stack">
-      <div class="grid grid-2">
-        <section class="card"><h2>Διαθέσιμοι φοιτητές</h2>${data.students.length ? data.students.map((student) => `<label class="choice-row"><input type="radio" name="studentId" value="${escapeHtml(student.id)}"><span>${escapeHtml(student.am)} · ${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}</span></label>`).join('') : empty('Δεν βρέθηκαν διαθέσιμοι φοιτητές.')}</section>
-        <section class="card"><h2>Διαθέσιμα θέματα</h2>${data.topics.length ? data.topics.map((topic) => `<label class="choice-row"><input type="radio" name="topicId" value="${escapeHtml(topic.id)}"><span class="choice-copy"><strong>${escapeHtml(topic.title)}</strong><span class="muted small">${escapeHtml(topic.summary)}</span></span></label>`).join('') : empty('Δεν βρέθηκαν διαθέσιμα θέματα.')}</section>
-      </div><div><button class="button button-success">Ανάθεση θέματος</button></div>
-    </form>`;
-    document.querySelector('#assign-form').addEventListener('submit', async (event) => {
-      event.preventDefault(); const formData = new FormData(event.currentTarget);
-      try { await api('/api/prof/assign', { method: 'POST', body: { studentId: formData.get('studentId'), topicId: formData.get('topicId') } }); showMessage('Η αρχική ανάθεση ολοκληρώθηκε.'); await renderResults(); }
-      catch (error) { showMessage(error.message, 'error'); }
-    });
-  };
-  document.querySelector('#search-form').addEventListener('submit', (event) => { event.preventDefault(); renderResults().catch((error) => showMessage(error.message, 'error')); });
-  await renderResults();
+
+  const searchForm = document.querySelector('#search-form');
+  searchForm.addEventListener('submit', (event) => {
+    event.preventDefault();
+    renderAssignmentChoices(searchForm).catch((error) => showMessage(error.message, 'error'));
+  });
+  await renderAssignmentChoices(searchForm);
 }
 
 function thesisActions(thesis) {
@@ -175,66 +236,190 @@ async function theses() {
 function bindThesisActions(reload) {
   content().querySelectorAll('[data-thesis]').forEach((card) => {
     const thesisId = card.dataset.thesis;
-    card.addEventListener('click', async (event) => {
-      const action = event.target.dataset.action;
-      if (!action) return;
-      try {
-        if (action === 'cancel-initial') {
-          if (!confirm('Να αναιρεθεί η αρχική ανάθεση;')) return;
-          await api('/api/thesis/transition', { method: 'POST', body: { thesisId, action: 'cancel_initial' } });
-        }
-        if (action === 'under-exam') await api('/api/thesis/transition', { method: 'POST', body: { thesisId, action: 'to_under_exam' } });
-        if (action === 'open-grading') await api('/api/thesis/transition', { method: 'POST', body: { thesisId, action: 'open_grading' } });
-        if (action === 'notes') {
-          const data = await api(`/api/prof/theses/${thesisId}/notes`);
-          const target = card.querySelector('[data-role="notes"]');
-          target.hidden = false;
-          target.innerHTML = data.items.length ? `<ul>${data.items.map((note) => `<li>${escapeHtml(note.text)} <span class="muted small">${formatDate(note.createdAt)}</span></li>`).join('')}</ul>` : empty('Δεν υπάρχουν σημειώσεις.');
-          return;
-        }
-        showMessage('Η ενέργεια ολοκληρώθηκε.'); await reload();
-      } catch (error) { showMessage(error.message, 'error'); }
+    card.addEventListener('click', (event) => {
+      handleThesisCardAction(event, card, thesisId, reload);
     });
-    card.querySelector('[data-role="note-form"]')?.addEventListener('submit', async (event) => {
-      event.preventDefault(); const form = event.currentTarget;
-      try { await api(`/api/prof/theses/${thesisId}/notes`, { method: 'POST', body: { text: form.text.value } }); form.reset(); showMessage('Η ιδιωτική σημείωση αποθηκεύτηκε.'); }
-      catch (error) { showMessage(error.message, 'error'); }
+    card.querySelector('[data-role="note-form"]')?.addEventListener('submit', (event) => {
+      addPrivateNote(event, thesisId);
     });
-    card.querySelector('[data-role="grade-form"]')?.addEventListener('submit', async (event) => {
-      event.preventDefault(); const form = event.currentTarget;
-      try { await api('/api/grades', { method: 'POST', body: { thesisId, comments: form.comments.value, criteria: { written: form.written.value, presentation: form.presentation.value, overall: form.overall.value } } }); showMessage('Η αναλυτική βαθμολογία αποθηκεύτηκε.'); await reload(); }
-      catch (error) { showMessage(error.message, 'error'); }
+    card.querySelector('[data-role="grade-form"]')?.addEventListener('submit', (event) => {
+      submitGrade(event, thesisId, reload);
     });
-    card.querySelector('[data-role="cancel-active"]')?.addEventListener('submit', async (event) => {
-      event.preventDefault(); const form = event.currentTarget;
-      if (!confirm('Να ακυρωθεί οριστικά η διπλωματική;')) return;
-      try { await api('/api/thesis/transition', { method: 'POST', body: { thesisId, action: 'cancel_active', gsNumber: form.gsNumber.value, gsYear: form.gsYear.value, reason: form.reason.value } }); showMessage('Η διπλωματική ακυρώθηκε.'); await reload(); }
-      catch (error) { showMessage(error.message, 'error'); }
+    card.querySelector('[data-role="cancel-active"]')?.addEventListener('submit', (event) => {
+      cancelActiveThesis(event, thesisId, reload);
     });
   });
 }
 
+async function cancelInitialAssignment(thesisId, reload) {
+  if (!confirm('Να αναιρεθεί η αρχική ανάθεση;')) return;
+
+  await api('/api/thesis/transition', {
+    method: 'POST',
+    body: { thesisId, action: 'cancel_initial' },
+  });
+  showMessage('Η ενέργεια ολοκληρώθηκε.');
+  await reload();
+}
+
+async function moveThesisUnderExam(thesisId, reload) {
+  await api('/api/thesis/transition', {
+    method: 'POST',
+    body: { thesisId, action: 'to_under_exam' },
+  });
+  showMessage('Η ενέργεια ολοκληρώθηκε.');
+  await reload();
+}
+
+async function openThesisGrading(thesisId, reload) {
+  await api('/api/thesis/transition', {
+    method: 'POST',
+    body: { thesisId, action: 'open_grading' },
+  });
+  showMessage('Η ενέργεια ολοκληρώθηκε.');
+  await reload();
+}
+
+function privateNotesList(notes) {
+  if (!notes.length) return empty('Δεν υπάρχουν σημειώσεις.');
+
+  const items = notes.map((note) => `
+    <li>${escapeHtml(note.text)} <span class="muted small">${formatDate(note.createdAt)}</span></li>
+  `).join('');
+  return `<ul>${items}</ul>`;
+}
+
+async function showPrivateNotes(card, thesisId) {
+  const data = await api(`/api/prof/theses/${thesisId}/notes`);
+  const notesContainer = card.querySelector('[data-role="notes"]');
+  notesContainer.hidden = false;
+  notesContainer.innerHTML = privateNotesList(data.items);
+}
+
+async function handleThesisCardAction(event, card, thesisId, reload) {
+  const action = event.target.dataset.action;
+  const actionHandlers = {
+    'cancel-initial': () => cancelInitialAssignment(thesisId, reload),
+    'under-exam': () => moveThesisUnderExam(thesisId, reload),
+    'open-grading': () => openThesisGrading(thesisId, reload),
+    notes: () => showPrivateNotes(card, thesisId),
+  };
+  const selectedAction = actionHandlers[action];
+  if (!selectedAction) return;
+
+  try {
+    await selectedAction();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+async function addPrivateNote(event, thesisId) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    await api(`/api/prof/theses/${thesisId}/notes`, {
+      method: 'POST',
+      body: { text: form.text.value },
+    });
+    form.reset();
+    showMessage('Η ιδιωτική σημείωση αποθηκεύτηκε.');
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+async function submitGrade(event, thesisId, reload) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const criteria = {
+    written: form.written.value,
+    presentation: form.presentation.value,
+    overall: form.overall.value,
+  };
+
+  try {
+    await api('/api/grades', {
+      method: 'POST',
+      body: { thesisId, comments: form.comments.value, criteria },
+    });
+    showMessage('Η αναλυτική βαθμολογία αποθηκεύτηκε.');
+    await reload();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+async function cancelActiveThesis(event, thesisId, reload) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  if (!confirm('Να ακυρωθεί οριστικά η διπλωματική;')) return;
+
+  try {
+    await api('/api/thesis/transition', {
+      method: 'POST',
+      body: {
+        thesisId,
+        action: 'cancel_active',
+        gsNumber: form.gsNumber.value,
+        gsYear: form.gsYear.value,
+        reason: form.reason.value,
+      },
+    });
+    showMessage('Η διπλωματική ακυρώθηκε.');
+    await reload();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+function invitationCard(invitation) {
+  return `<article class="card split" data-invitation="${escapeHtml(invitation.id)}">
+    <div><h3>${escapeHtml(invitation.topic)}</h3><div class="meta-list"><span><strong>Φοιτητής:</strong> ${escapeHtml(invitation.student)}</span><span><strong>Επιβλέπων:</strong> ${escapeHtml(invitation.supervisor)}</span><span>${formatDate(invitation.createdAt)}</span></div></div>
+    <div class="inline"><button class="button button-success button-small" data-action="accept">Αποδοχή</button><button class="button button-danger button-small" data-action="decline">Απόρριψη</button></div>
+  </article>`;
+}
+
+async function answerInvitation(event) {
+  const action = event.target.dataset.action;
+  if (!action) return;
+
+  const invitationId = event.currentTarget.dataset.invitation;
+  try {
+    await api('/api/committee/invitations', {
+      method: 'PATCH',
+      body: { id: invitationId, action },
+    });
+    showMessage('Η απάντηση αποθηκεύτηκε.');
+    await invitations();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
 async function invitations() {
   const data = await api('/api/committee/invitations');
-  content().innerHTML = data.items.length ? data.items.map((item) => `<article class="card split" data-invitation="${escapeHtml(item.id)}">
-    <div><h3>${escapeHtml(item.topic)}</h3><div class="meta-list"><span><strong>Φοιτητής:</strong> ${escapeHtml(item.student)}</span><span><strong>Επιβλέπων:</strong> ${escapeHtml(item.supervisor)}</span><span>${formatDate(item.createdAt)}</span></div></div>
-    <div class="inline"><button class="button button-success button-small" data-action="accept">Αποδοχή</button><button class="button button-danger button-small" data-action="decline">Απόρριψη</button></div>
-  </article>`).join('') : empty('Δεν υπάρχουν ενεργές προσκλήσεις.');
-  content().querySelectorAll('[data-invitation]').forEach((card) => card.addEventListener('click', async (event) => {
-    const action = event.target.dataset.action; if (!action) return;
-    try { await api('/api/committee/invitations', { method: 'PATCH', body: { id: card.dataset.invitation, action } }); showMessage('Η απάντηση αποθηκεύτηκε.'); await invitations(); }
-    catch (error) { showMessage(error.message, 'error'); }
-  }));
+  content().innerHTML = data.items.length
+    ? data.items.map(invitationCard).join('')
+    : empty('Δεν υπάρχουν ενεργές προσκλήσεις.');
+
+  content().querySelectorAll('[data-invitation]').forEach((card) => {
+    card.addEventListener('click', answerInvitation);
+  });
 }
 
 function statsGroup(title, data) {
-  const maxCount = Math.max(1, ...Object.values(data.counts));
-  const bars = Object.entries(data.counts).map(([status, count]) => `<div class="bar-row"><span>${escapeHtml(STATUS_LABELS[status] || status)}</span><div class="bar-track"><div class="bar-fill" style="width:${(count / maxCount) * 100}%"></div></div><strong>${count}</strong></div>`).join('');
+  const statusCounts = Object.entries(data.counts).map(([status, count]) => `
+    <div class="status-count">
+      <span>${escapeHtml(STATUS_LABELS[status] || status)}</span>
+      <strong>${count}</strong>
+    </div>
+  `).join('');
   return `<section class="section"><h2 class="section-heading">${title}</h2><div class="grid grid-3">
     <div class="card metric"><span class="muted">Σύνολο</span><strong class="metric-value">${data.total}</strong></div>
     <div class="card metric"><span class="muted">Μέσος βαθμός</span><strong class="metric-value">${data.averageGrade ?? '—'}</strong></div>
     <div class="card metric"><span class="muted">Μέσος χρόνος ολοκλήρωσης</span><strong class="metric-value">${data.averageCompletionDays ?? '—'}${data.averageCompletionDays != null ? ' ημ.' : ''}</strong></div>
-  </div><div class="card section"><h3>Πλήθος ανά κατάσταση</h3><div class="bar-chart">${bars}</div></div></section>`;
+  </div><div class="card section"><h3>Πλήθος ανά κατάσταση</h3><div class="status-count-list">${statusCounts}</div></div></section>`;
 }
 
 async function stats() {

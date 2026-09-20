@@ -1,7 +1,7 @@
 const form = document.querySelector('#login-form');
 const errorNode = document.querySelector('#login-error');
 
-form?.addEventListener('submit', async (event) => {
+async function submitLogin(event) {
   event.preventDefault();
   errorNode.hidden = true;
   const button = form.querySelector('button');
@@ -24,4 +24,6 @@ form?.addEventListener('submit', async (event) => {
   } finally {
     button.disabled = false;
   }
-});
+}
+
+form?.addEventListener('submit', submitLogin);

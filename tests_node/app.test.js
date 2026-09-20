@@ -97,6 +97,48 @@ test('CSRF and role separation reject unauthorized writes', async () => {
   assert.equal(adminEndpoint.status, 403);
 });
 
+test('topic editing, initial cancellation and student profile update work', async () => {
+  const professor = await login('prof001@uni.local', '/prof');
+  const student = await login('student001@uni.local', '/student');
+
+  const topic = await api(professor, '/api/prof/topics', 'POST', {
+    title: 'Refactor verification topic',
+    summary: 'Original summary',
+  });
+  await api(professor, `/api/prof/topics/${topic.id}`, 'PATCH', {
+    title: 'Updated verification topic',
+    summary: 'Updated summary',
+  });
+  const topics = await api(professor, '/api/prof/topics');
+  const updatedTopic = topics.items.find((item) => item.id === topic.id);
+  assert.equal(updatedTopic.title, 'Updated verification topic');
+  assert.equal(updatedTopic.summary, 'Updated summary');
+
+  const candidate = database.one(`
+    SELECT Student.id FROM Student
+    LEFT JOIN Thesis ON Thesis.studentId = Student.id
+    WHERE Thesis.id IS NULL ORDER BY Student.am LIMIT 1
+  `);
+  assert.ok(candidate);
+  const assignment = await api(professor, '/api/prof/assign', 'POST', {
+    studentId: candidate.id,
+    topicId: topic.id,
+  });
+  await api(professor, '/api/thesis/transition', 'POST', {
+    thesisId: assignment.id,
+    action: 'cancel_initial',
+  });
+  assert.equal(database.one('SELECT id FROM Thesis WHERE id = ?', assignment.id), null);
+
+  const originalProfile = await api(student, '/api/student/profile');
+  await api(student, '/api/student/profile', 'PATCH', {
+    ...originalProfile,
+    address: 'Integration test address',
+  });
+  const updatedProfile = await api(student, '/api/student/profile');
+  assert.equal(updatedProfile.address, 'Integration test address');
+});
+
 test('complete thesis lifecycle works through the Node.js HTTP API', async () => {
   const supervisor = await login('prof001@uni.local', '/prof');
   const member2 = await login('prof002@uni.local', '/prof');
@@ -160,7 +202,10 @@ test('complete thesis lifecycle works through the Node.js HTTP API', async () =>
   }
   const examRecord = await rawRequest(`/api/theses/${thesisId}/exam-record`, { headers: { Cookie: student.cookie } });
   assert.equal(examRecord.status, 200);
-  assert.match(await examRecord.text(), /Final grade/);
+  const examRecordHtml = await examRecord.text();
+  assert.match(examRecordHtml, /Final grade/);
+  assert.match(examRecordHtml, /\/static\/js\/exam-record\.js/);
+  assert.doesNotMatch(examRecordHtml, /onclick=/);
   await api(student, '/api/student/final-repository', 'POST', { url: 'https://nemertes.library.example/thesis-test' });
   await api(secretariat, '/api/admin/theses', 'PATCH', { thesisId, action: 'complete' });
 

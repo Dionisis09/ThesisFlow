@@ -1,5 +1,5 @@
-import { api } from './api.js';
-import { clearMessage, dashboardCard, dashboardHero, empty, escapeHtml, formatDate, showMessage, statusBadge, toLocalInput } from './ui.js';
+import { api } from './api.js?v=20260920-1';
+import { clearMessage, dashboardCard, dashboardHero, empty, escapeHtml, formatDate, showMessage, statusBadge, toLocalInput } from './ui.js?v=20260920-1';
 
 const content = () => document.querySelector('#page-content');
 
@@ -17,17 +17,162 @@ function dashboard() {
     <div class="grid dashboard-grid">${cards.map(dashboardCard).join('')}</div>`;
 }
 
+async function saveFinalRepository(event) {
+  event.preventDefault();
+  clearMessage();
+  const form = event.currentTarget;
+  try {
+    await api('/api/student/final-repository', {
+      method: 'POST',
+      body: { url: form.url.value },
+    });
+    showMessage('Ο σύνδεσμος τελικού κειμένου αποθηκεύτηκε.');
+    await studentThesis();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+async function updateProfile(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    await api('/api/student/profile', {
+      method: 'PATCH',
+      body: {
+        address: form.address.value,
+        email: form.email.value,
+        mobile: form.mobile.value,
+        landline: form.landline.value,
+      },
+    });
+    showMessage('Το προφίλ ενημερώθηκε.');
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+async function sendCommitteeInvitations(event) {
+  event.preventDefault();
+  const checkedBoxes = event.currentTarget.querySelectorAll('input[name="codes"]:checked');
+  const professorCodes = [...checkedBoxes].map((checkbox) => checkbox.value);
+  try {
+    await api('/api/committee/invitations', {
+      method: 'POST',
+      body: { professorCodes },
+    });
+    showMessage('Οι προσκλήσεις στάλθηκαν.');
+    await invitations();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+async function uploadDraft(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const formData = new FormData();
+  formData.append('file', form.file.files[0]);
+  try {
+    await api('/api/upload/thesis-draft', { method: 'POST', body: formData });
+    showMessage('Το PDF ανέβηκε επιτυχώς.');
+    await upload();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+async function addMaterial(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    await api('/api/student/materials', {
+      method: 'POST',
+      body: { label: form.label.value, url: form.url.value },
+    });
+    showMessage('Ο σύνδεσμος προστέθηκε.');
+    form.reset();
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+function updatePresentationFields(form) {
+  document.querySelector('#room-field').hidden = form.mode.value === 'ONLINE';
+  document.querySelector('#meeting-field').hidden = form.mode.value !== 'ONLINE';
+}
+
+async function savePresentation(event) {
+  event.preventDefault();
+  const form = event.currentTarget;
+  try {
+    await api('/api/student/presentation', {
+      method: 'POST',
+      body: {
+        date: form.date.value,
+        mode: form.mode.value,
+        title: form.title.value,
+        room: form.room.value,
+        meetingUrl: form.meetingUrl.value,
+      },
+    });
+    showMessage('Τα στοιχεία παρουσίασης αποθηκεύτηκαν.');
+  } catch (error) {
+    showMessage(error.message, 'error');
+  }
+}
+
+function gradeCriteriaText(grade) {
+  const hasCriteria = Object.keys(grade.criteria || {}).length > 0;
+  if (!hasCriteria) return '—';
+
+  return `Γραπτό ${escapeHtml(grade.criteria.written)} · Παρουσίαση ${escapeHtml(grade.criteria.presentation)} · Σύνολο ${escapeHtml(grade.criteria.overall)}`;
+}
+
 function gradeRows(thesis) {
   if (!thesis.grades?.length) return empty('Δεν έχουν καταχωριστεί βαθμοί.');
   return `<div class="table-wrap"><table>
     <thead><tr><th>Διδάσκων</th><th>Κριτήρια</th><th>Βαθμός</th><th>Σχόλια</th></tr></thead>
     <tbody>${thesis.grades.map((grade) => `<tr>
       <td>${escapeHtml(grade.professor.fullName)}</td>
-      <td>${Object.keys(grade.criteria || {}).length ? `Γραπτό ${escapeHtml(grade.criteria.written)} · Παρουσίαση ${escapeHtml(grade.criteria.presentation)} · Σύνολο ${escapeHtml(grade.criteria.overall)}` : '—'}</td>
+      <td>${gradeCriteriaText(grade)}</td>
       <td>${escapeHtml(grade.value)}</td>
       <td>${escapeHtml(grade.comments || '—')}</td>
     </tr>`).join('')}</tbody>
   </table></div>`;
+}
+
+function thesisHistory(thesis) {
+  if (!thesis.history?.length) {
+    return empty('Δεν υπάρχουν ακόμη καταγεγραμμένες μεταβάσεις.');
+  }
+
+  const items = thesis.history.map((historyItem) => `
+    <li><strong>${escapeHtml(historyItem.toStatus)}</strong><br><span class="muted small">${formatDate(historyItem.createdAt)} · ${escapeHtml(historyItem.note || '')}</span></li>
+  `).join('');
+  return `<ul class="timeline">${items}</ul>`;
+}
+
+function thesisMaterials(thesis) {
+  if (!thesis.materials?.length) return '<span class="muted">—</span>';
+
+  const items = thesis.materials.map((material) => `
+    <li><a href="${escapeHtml(material.url)}" target="_blank" rel="noreferrer">${escapeHtml(material.label)}</a></li>
+  `).join('');
+  return `<ul>${items}</ul>`;
+}
+
+function validGradeCount(thesis) {
+  return thesis.grades?.filter((grade) => grade.value >= 0 && grade.value <= 10).length || 0;
+}
+
+function finalRepositoryForm(thesis, gradeCount) {
+  const canAddRepository = thesis.status === 'UNDER_EXAM'
+    && gradeCount === 3
+    && !thesis.finalRepositoryUrl;
+  if (!canAddRepository) return '';
+
+  return `<form id="repository-form" class="inline section"><input class="compact-input" name="url" type="url" placeholder="Σύνδεσμος Νημερτή" required><button class="button button-primary">Καταχώριση τελικού κειμένου</button></form>`;
 }
 
 async function studentThesis() {
@@ -38,16 +183,10 @@ async function studentThesis() {
   }
   const thesis = data.thesis;
   const members = [thesis.supervisor, ...(thesis.members || [])];
-  const history = thesis.history?.length
-    ? `<ul class="timeline">${thesis.history.map((item) => `<li><strong>${escapeHtml(item.toStatus)}</strong><br><span class="muted small">${formatDate(item.createdAt)} · ${escapeHtml(item.note || '')}</span></li>`).join('')}</ul>`
-    : empty('Δεν υπάρχουν ακόμη καταγεγραμμένες μεταβάσεις.');
-  const materials = thesis.materials?.length
-    ? `<ul>${thesis.materials.map((item) => `<li><a href="${escapeHtml(item.url)}" target="_blank" rel="noreferrer">${escapeHtml(item.label)}</a></li>`).join('')}</ul>`
-    : '<span class="muted">—</span>';
-  const gradeCount = thesis.grades?.filter((item) => item.value >= 0 && item.value <= 10).length || 0;
-  const repositoryForm = thesis.status === 'UNDER_EXAM' && gradeCount === 3 && !thesis.finalRepositoryUrl
-    ? `<form id="repository-form" class="inline section"><input class="compact-input" name="url" type="url" placeholder="Σύνδεσμος Νημερτή" required><button class="button button-primary">Καταχώριση τελικού κειμένου</button></form>`
-    : '';
+  const history = thesisHistory(thesis);
+  const materials = thesisMaterials(thesis);
+  const gradeCount = validGradeCount(thesis);
+  const repositoryForm = finalRepositoryForm(thesis, gradeCount);
 
   content().innerHTML = `
     <section class="card">
@@ -72,15 +211,7 @@ async function studentThesis() {
       <div class="card"><h2 class="section-heading">Υποστηρικτικό υλικό</h2>${materials}</div>
     </section>`;
 
-  document.querySelector('#repository-form')?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    clearMessage();
-    try {
-      await api('/api/student/final-repository', { method: 'POST', body: { url: event.currentTarget.url.value } });
-      showMessage('Ο σύνδεσμος τελικού κειμένου αποθηκεύτηκε.');
-      await studentThesis();
-    } catch (error) { showMessage(error.message, 'error'); }
-  });
+  document.querySelector('#repository-form')?.addEventListener('submit', saveFinalRepository);
 }
 
 async function profile() {
@@ -92,55 +223,63 @@ async function profile() {
     <label>Σταθερό τηλέφωνο<input name="landline" value="${escapeHtml(data.landline)}"></label>
     <div class="full"><button class="button button-primary">Αποθήκευση</button></div>
   </form>`;
-  document.querySelector('#profile-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    try {
-      await api('/api/student/profile', { method: 'PATCH', body: {
-        address: form.address.value, email: form.email.value, mobile: form.mobile.value, landline: form.landline.value,
-      }});
-      showMessage('Το προφίλ ενημερώθηκε.');
-    } catch (error) { showMessage(error.message, 'error'); }
-  });
+  document.querySelector('#profile-form').addEventListener('submit', updateProfile);
+}
+
+function acceptedProfessorIds(invitations) {
+  const acceptedInvitations = invitations.filter((invitation) => invitation.status === 'ACCEPTED');
+  return new Set(acceptedInvitations.map((invitation) => invitation.professor.id));
+}
+
+function availableProfessorChoices(professors, thesis, invitations) {
+  const acceptedIds = acceptedProfessorIds(invitations);
+  return professors.filter((professor) => (
+    professor.id !== thesis.supervisor.id && !acceptedIds.has(professor.id)
+  ));
+}
+
+function professorChoice(professor) {
+  return `<label class="card"><span><input type="checkbox" name="codes" value="${escapeHtml(professor.code)}" style="width:auto"> ${escapeHtml(professor.fullName)} (${escapeHtml(professor.code)})</span></label>`;
+}
+
+function invitationProgressCard(invitation) {
+  return `<article class="card split"><span>${escapeHtml(invitation.professor.fullName)} (${escapeHtml(invitation.professor.code)})<br><span class="muted small">Αποστολή: ${formatDate(invitation.createdAt)} · Απάντηση: ${formatDate(invitation.respondedAt)}</span></span><strong>${escapeHtml(invitation.status)}</strong></article>`;
 }
 
 async function invitations() {
   const [thesisData, professorData, invitationData] = await Promise.all([
-    api('/api/student/thesis'), api('/api/profs/list'), api('/api/committee/invitations'),
+    api('/api/student/thesis'),
+    api('/api/profs/list'),
+    api('/api/committee/invitations'),
   ]);
   if (!thesisData.thesis) {
     content().innerHTML = empty('Χρειάζεται πρώτα αρχική ανάθεση θέματος από διδάσκοντα.');
     return;
   }
   const thesis = thesisData.thesis;
-  const invitedIds = new Set((invitationData.items || []).filter((item) => item.status === 'ACCEPTED').map((item) => item.professor.id));
-  const choices = professorData.items.filter((professor) => professor.id !== thesis.supervisor.id && !invitedIds.has(professor.id));
+  const invitationItems = invitationData.items || [];
+  const choices = availableProfessorChoices(professorData.items, thesis, invitationItems);
   const canInvite = thesis.status === 'UNDER_ASSIGNMENT';
   content().innerHTML = `
     <section class="card">
       <div class="split"><h2>Επιλογή διδασκόντων</h2>${statusBadge(thesis.status)}</div>
       ${canInvite ? `<form id="invite-form" class="stack">
-        <div class="grid grid-2">${choices.map((professor) => `<label class="card"><span><input type="checkbox" name="codes" value="${escapeHtml(professor.code)}" style="width:auto"> ${escapeHtml(professor.fullName)} (${escapeHtml(professor.code)})</span></label>`).join('')}</div>
+        <div class="grid grid-2">${choices.map(professorChoice).join('')}</div>
         <div><button class="button button-primary">Αποστολή προσκλήσεων</button></div>
       </form>` : '<p class="muted">Η τριμελής έχει οριστικοποιηθεί.</p>'}
     </section>
     <section class="section"><h2 class="section-heading">Πορεία προσκλήσεων</h2>
-      ${(invitationData.items || []).length ? invitationData.items.map((item) => `<article class="card split"><span>${escapeHtml(item.professor.fullName)} (${escapeHtml(item.professor.code)})<br><span class="muted small">Αποστολή: ${formatDate(item.createdAt)} · Απάντηση: ${formatDate(item.respondedAt)}</span></span><strong>${escapeHtml(item.status)}</strong></article>`).join('') : empty('Δεν υπάρχουν προσκλήσεις.')}
+      ${invitationItems.length ? invitationItems.map(invitationProgressCard).join('') : empty('Δεν υπάρχουν προσκλήσεις.')}
     </section>`;
-  document.querySelector('#invite-form')?.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const codes = [...event.currentTarget.querySelectorAll('input[name="codes"]:checked')].map((node) => node.value);
-    try {
-      await api('/api/committee/invitations', { method: 'POST', body: { professorCodes: codes } });
-      showMessage('Οι προσκλήσεις στάλθηκαν.');
-      await invitations();
-    } catch (error) { showMessage(error.message, 'error'); }
-  });
+  document.querySelector('#invite-form')?.addEventListener('submit', sendCommitteeInvitations);
 }
 
 async function upload() {
   const { thesis } = await api('/api/student/thesis');
-  if (!thesis) { content().innerHTML = empty('Δεν υπάρχει διπλωματική.'); return; }
+  if (!thesis) {
+    content().innerHTML = empty('Δεν υπάρχει διπλωματική.');
+    return;
+  }
   if (thesis.status !== 'UNDER_EXAM') {
     content().innerHTML = empty('Τα αρχεία και οι σύνδεσμοι ενεργοποιούνται όταν ο επιβλέπων θέσει τη διπλωματική σε κατάσταση «Υπό εξέταση».');
     return;
@@ -161,25 +300,16 @@ async function upload() {
         <button class="button button-primary">Προσθήκη συνδέσμου</button>
       </form>
     </div>`;
-  document.querySelector('#draft-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    const data = new FormData();
-    data.append('file', form.file.files[0]);
-    try { await api('/api/upload/thesis-draft', { method: 'POST', body: data }); showMessage('Το PDF ανέβηκε επιτυχώς.'); await upload(); }
-    catch (error) { showMessage(error.message, 'error'); }
-  });
-  document.querySelector('#material-form').addEventListener('submit', async (event) => {
-    event.preventDefault();
-    const form = event.currentTarget;
-    try { await api('/api/student/materials', { method: 'POST', body: { label: form.label.value, url: form.url.value } }); showMessage('Ο σύνδεσμος προστέθηκε.'); form.reset(); }
-    catch (error) { showMessage(error.message, 'error'); }
-  });
+  document.querySelector('#draft-form').addEventListener('submit', uploadDraft);
+  document.querySelector('#material-form').addEventListener('submit', addMaterial);
 }
 
 async function presentation() {
   const { thesis } = await api('/api/student/thesis');
-  if (!thesis) { content().innerHTML = empty('Δεν υπάρχει διπλωματική.'); return; }
+  if (!thesis) {
+    content().innerHTML = empty('Δεν υπάρχει διπλωματική.');
+    return;
+  }
   if (thesis.status !== 'UNDER_EXAM') {
     content().innerHTML = empty('Τα στοιχεία παρουσίασης ενεργοποιούνται όταν ο επιβλέπων θέσει τη διπλωματική σε κατάσταση «Υπό εξέταση».');
     return;
@@ -194,21 +324,9 @@ async function presentation() {
     <div class="full"><button class="button button-primary">Αποθήκευση</button></div>
   </form>`;
   const form = document.querySelector('#presentation-form');
-  const syncMode = () => {
-    document.querySelector('#room-field').hidden = form.mode.value === 'ONLINE';
-    document.querySelector('#meeting-field').hidden = form.mode.value !== 'ONLINE';
-  };
-  form.mode.addEventListener('change', syncMode); syncMode();
-  form.addEventListener('submit', async (event) => {
-    event.preventDefault();
-    try {
-      await api('/api/student/presentation', { method: 'POST', body: {
-        date: form.date.value, mode: form.mode.value, title: form.title.value,
-        room: form.room.value, meetingUrl: form.meetingUrl.value,
-      }});
-      showMessage('Τα στοιχεία παρουσίασης αποθηκεύτηκαν.');
-    } catch (error) { showMessage(error.message, 'error'); }
-  });
+  form.mode.addEventListener('change', () => updatePresentationFields(form));
+  updatePresentationFields(form);
+  form.addEventListener('submit', savePresentation);
 }
 
 export async function renderStudent(page) {

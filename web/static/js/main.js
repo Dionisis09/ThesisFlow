@@ -1,7 +1,7 @@
-import { renderAdmin } from './secretariat.js';
-import { renderProfessor } from './professor.js';
-import { renderStudent } from './student.js';
-import { showMessage } from './ui.js';
+import { renderAdmin } from './secretariat.js?v=20260920-1';
+import { renderProfessor } from './professor.js?v=20260920-1';
+import { renderStudent } from './student.js?v=20260920-1';
+import { showMessage } from './ui.js?v=20260920-1';
 
 const workspace = document.querySelector('#workspace');
 const page = workspace?.dataset.page || '';

@@ -212,10 +212,9 @@ input:focus, textarea:focus, select:focus { border-color: var(--blue); box-shado
 .timeline li { position: relative; padding: 0 0 18px 24px; border-left: 2px solid #dbe5f1; }
 .timeline li::before { content: ""; position: absolute; left: -6px; top: 3px; width: 10px; height: 10px; border-radius: 50%; background: var(--blue); }
 details > summary { cursor: pointer; color: var(--blue); font-weight: 750; }
-.bar-chart { display: grid; gap: 12px; }
-.bar-row { display: grid; grid-template-columns: minmax(120px, 1fr) 4fr 34px; align-items: center; gap: 10px; font-size: .86rem; }
-.bar-track { height: 12px; overflow: hidden; border-radius: 999px; background: #e5ebf3; }
-.bar-fill { min-width: 3px; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--blue), #65a2f4); }
+.status-count-list { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 14px; }
+.status-count { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; border-radius: 10px; color: #536176; background: #f5f7fa; font-size: .86rem; }
+.status-count strong { color: var(--navy); font-size: 1rem; }
 
 table { width: 100%; border-collapse: collapse; background: #fff; }
 th, td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
@@ -244,6 +243,7 @@ code { padding: 2px 5px; border-radius: 4px; background: #edf1f5; }
   .sidebar a { flex: 0 0 auto; margin: 0; }
   .content { padding: 26px 18px; }
   .grid-3, .grid-4, .details-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .status-count-list { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .login-layout { grid-template-columns: 1fr; }
   .login-intro { min-height: 42vh; padding: 38px 28px; }
@@ -256,7 +256,7 @@ code { padding: 2px 5px; border-radius: 4px; background: #edf1f5; }
   .user-menu { justify-content: flex-end; flex-wrap: wrap; }
   .user-email { display: none; }
   .content { padding: 22px 14px; }
-  .grid-2, .grid-3, .grid-4, .form-grid, .details-grid { grid-template-columns: 1fr; }
+  .grid-2, .grid-3, .grid-4, .form-grid, .details-grid, .status-count-list { grid-template-columns: 1fr; }
   .form-grid .full { grid-column: auto; }
   .split { flex-direction: column; }
   .page-heading { align-items: start; flex-direction: column; }

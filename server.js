@@ -59,9 +59,11 @@ export function createApp() {
   });
   app.get('/', (req, res) => res.redirect(req.user ? roleHome(req.user.role) : '/auth/login'));
 
-  for (const [route, [role, title, pageKey]] of Object.entries(PAGE_DEFINITIONS)) {
-    app.get(route, requirePageRole(role), (req, res) => {
-      res.type('html').send(workspacePage(req.user, title, pageKey, req.session.csrfToken));
+  for (const [route, pageDefinition] of Object.entries(PAGE_DEFINITIONS)) {
+    const [allowedRole, pageTitle, pageKey] = pageDefinition;
+    app.get(route, requirePageRole(allowedRole), (req, res) => {
+      const html = workspacePage(req.user, pageTitle, pageKey, req.session.csrfToken);
+      res.type('html').send(html);
     });
   }
 
