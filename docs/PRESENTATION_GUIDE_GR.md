@@ -263,6 +263,7 @@ UNDER_ASSIGNMENT -> αναίρεση αρχικής ανάθεσης
 | Τεχνολογίες μαθήματος | Node.js/Express, vanilla JavaScript, HTML/CSS |
 | Λίγες γλώσσες | Μία γλώσσα προγραμματισμού, JavaScript, και στις δύο πλευρές |
 | Open-source βάση | SQLite `data/dev.db`, `node:sqlite` στο `node_app/db.js:4-17` |
+| Export βάσης για παράδοση | `database/thesisflow.sql`, ανανέωση με `npm run db:export` |
 | AJAX-only | `fetch()` στο `web/static/js/api.js:4-24` |
 | Χωρίς PHP-generated JS | Δεν υπάρχει PHP στο ενεργό project |
 | Indexes | `node_app/db.js:235-246` |

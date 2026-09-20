@@ -27,6 +27,7 @@ npm start
 npm run check
 npm test
 npm run db:verify
+npm run db:export
 ```
 
 Τα tests χρησιμοποιούν απομονωμένο αντίγραφο της βάσης και ελέγχουν σύνδεση, ρόλους, CSRF, δημόσια JSON/XML feeds, caching, indexes και ολόκληρο τον κύκλο ζωής μιας διπλωματικής.
@@ -39,6 +40,7 @@ npm run db:verify
 - `node_app/auth.js`: sessions, ρόλοι και CSRF.
 - `node_app/pages.js`: δημιουργία των HTML σελίδων ανά ρόλο.
 - `data/dev.db`: έτοιμη βάση SQLite με δεδομένα επίδειξης.
+- `database/thesisflow.sql`: SQL export με ολόκληρο το σχήμα, τα δεδομένα και τα indexes της βάσης.
 - `web/static/js`: κώδικας browser και AJAX.
 - `web/static/css/app.css`: εμφάνιση και responsive layout.
 - `tests_node`: integration tests.

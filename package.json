@@ -8,8 +8,9 @@
     "start": "node server.js",
     "dev": "node --watch server.js",
     "test": "node --test tests_node/*.test.js",
-    "check": "node --check server.js && node --check node_app/auth.js && node --check node_app/db.js && node --check node_app/pages.js && node --check node_app/routes.js && node --check web/static/js/api.js && node --check web/static/js/login.js && node --check web/static/js/main.js && node --check web/static/js/professor.js && node --check web/static/js/secretariat.js && node --check web/static/js/student.js && node --check web/static/js/ui.js",
-    "db:verify": "node node_app/verify-db.js"
+    "check": "node --check server.js && node --check node_app/auth.js && node --check node_app/db.js && node --check node_app/export-db.js && node --check node_app/pages.js && node --check node_app/routes.js && node --check web/static/js/api.js && node --check web/static/js/login.js && node --check web/static/js/main.js && node --check web/static/js/professor.js && node --check web/static/js/secretariat.js && node --check web/static/js/student.js && node --check web/static/js/ui.js",
+    "db:verify": "node node_app/verify-db.js",
+    "db:export": "node node_app/export-db.js"
   },
   "engines": {
     "node": ">=22.5"
