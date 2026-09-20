@@ -5,8 +5,10 @@ import { DatabaseSync } from 'node:sqlite';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const SOURCE_DB = path.join(ROOT, 'data', 'dev.db');
-const OUTPUT_DIR = path.join(ROOT, 'database');
-const OUTPUT_SQL = path.join(OUTPUT_DIR, 'thesisflow.sql');
+const OUTPUT_FILES = [
+  path.join(ROOT, 'data', 'thesisflow.sql'),
+  path.join(ROOT, 'database', 'thesisflow.sql'),
+];
 
 function quoteIdentifier(value) {
   return `"${String(value).replaceAll('"', '""')}"`;
@@ -75,8 +77,10 @@ for (const index of indexes) {
 lines.push('', 'COMMIT;', 'PRAGMA foreign_keys = ON;', '');
 const sql = lines.join('\n');
 
-fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-fs.writeFileSync(OUTPUT_SQL, sql, 'utf8');
+for (const outputFile of OUTPUT_FILES) {
+  fs.mkdirSync(path.dirname(outputFile), { recursive: true });
+  fs.writeFileSync(outputFile, sql, 'utf8');
+}
 source.close();
 
 // Rebuild the database in memory to verify that the export is self-contained.
@@ -97,7 +101,7 @@ if (integrity !== 'ok' || foreignKeyViolations !== 0) {
 }
 
 console.log(JSON.stringify({
-  output: path.relative(ROOT, OUTPUT_SQL),
+  outputs: OUTPUT_FILES.map((outputFile) => path.relative(ROOT, outputFile)),
   tables: tables.length,
   rows: exportedRows,
   indexes: indexes.length,

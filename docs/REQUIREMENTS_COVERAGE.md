@@ -12,7 +12,7 @@ Checked against `Ergastiriaki_Askisi_24-25-1.0.pdf` on 2026-09-12.
 | Database content loaded through AJAX | All dynamic page content is loaded with `fetch()` from JSON APIs | Covered |
 | Do not generate JavaScript through PHP | No PHP exists in the active source | Covered |
 | Appropriate database indexes | Eight explicit workflow/query indexes in `node_app/db.js` | Covered |
-| Database export deliverable | Reproducible schema-and-data dump in `database/thesisflow.sql`; regenerate with `npm run db:export` | Covered |
+| Database export deliverable | Reproducible schema-and-data dump in `data/thesisflow.sql` and `database/thesisflow.sql`; regenerate both with `npm run db:export` | Covered |
 | Responsive student front-end | CSS breakpoints at 900px and 620px; live test at 390x844 | Covered |
 | Server cache TTL configuration | Public feed: 60 seconds; JS/CSS/SVG: 3600 seconds; uploads: 300 seconds | Covered |
 
