@@ -51,20 +51,24 @@ export const PAGE_DEFINITIONS = {
   '/admin/import': ['SECRETARIAT', 'Data import', 'admin-import'],
 };
 
+// Κωδικοποιεί δυναμικές τιμές πριν τοποθετηθούν στα HTML templates.
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
     '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;',
   })[character]);
 }
 
+// Επιστρέφει το στατικό HTML της σελίδας σύνδεσης.
 export function loginPage() {
   return LOGIN_HTML;
 }
 
+// Αντιστοιχίζει κάθε ρόλο στην αρχική του σελίδα.
 export function roleHome(role) {
   return ROLE_HOME[role] || '/auth/login';
 }
 
+// Συμπληρώνει το κοινό HTML template με χρήστη, πλοήγηση και CSRF token.
 export function workspacePage(user, title, pageKey, csrfToken) {
   const navigation = (NAV[user.role] || [])
     .map(([href, label]) => `<a href="${href}">${label}</a>`)
@@ -77,5 +81,6 @@ export function workspacePage(user, title, pageKey, csrfToken) {
     '{{NAVIGATION}}': navigation,
     '{{PAGE_KEY}}': escapeHtml(pageKey),
   };
+  // reduce αντικαθιστά διαδοχικά κάθε placeholder μέσα στο ίδιο template.
   return Object.entries(values).reduce((html, [token, value]) => html.replaceAll(token, value), WORKSPACE_HTML);
 }

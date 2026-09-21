@@ -1,5 +1,6 @@
 import { all, db, one } from './db.js';
 
+// Εκτελεί ελέγχους ακεραιότητας και συγκεντρώνει βασικά πλήθη της SQLite βάσης.
 const result = {
   integrity: one('PRAGMA integrity_check').integrity_check,
   foreignKeyViolations: all('PRAGMA foreign_key_check').length,

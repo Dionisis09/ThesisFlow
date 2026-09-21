@@ -23,10 +23,12 @@ import {
   TWO_YEARS_MS,
 } from './helpers.js';
 
+// Επιστρέφει τα θέματα του συνδεδεμένου διδάσκοντα και αν έχουν ανατεθεί.
 function listTopics(req, res) {
   const professor = currentProfessor(req.user.id);
   if (!professor) return res.status(404).json({ error: 'Invalid request.' });
 
+  // Το EXISTS επιστρέφει 1 όταν υπάρχει Thesis που χρησιμοποιεί το θέμα.
   const rows = all(`
     SELECT Topic.*, EXISTS(SELECT 1 FROM Thesis WHERE Thesis.topicId = Topic.id) AS assigned
     FROM Topic WHERE Topic.supervisorId = ? ORDER BY Topic.createdAt DESC
@@ -42,6 +44,7 @@ function listTopics(req, res) {
   return res.json({ items });
 }
 
+// Ελέγχει τα δεδομένα και δημιουργεί νέο διαθέσιμο θέμα.
 function createTopic(req, res) {
   const professor = currentProfessor(req.user.id);
   if (!professor) return res.status(404).json({ error: 'Invalid request.' });
@@ -53,6 +56,7 @@ function createTopic(req, res) {
   }
 
   const topicId = newId();
+  // Προσθέτει το θέμα στη βάση με ιδιοκτήτη τον συνδεδεμένο διδάσκοντα.
   run(
     'INSERT INTO Topic (id, title, summary, descriptionUrl, status, supervisorId, createdAt) VALUES (?, ?, ?, NULL, ?, ?, ?)',
     topicId,
@@ -65,6 +69,7 @@ function createTopic(req, res) {
   return res.status(201).json({ id: topicId });
 }
 
+// Ενημερώνει τίτλο, σύνοψη ή διαθεσιμότητα μόνο πριν από την ανάθεση.
 function updateTopic(req, res) {
   const professor = currentProfessor(req.user.id);
   const topic = one('SELECT * FROM Topic WHERE id = ?', req.params.id);
@@ -72,6 +77,7 @@ function updateTopic(req, res) {
     return res.status(404).json({ error: 'Invalid request.' });
   }
 
+  // Ελέγχει αν το θέμα χρησιμοποιείται ήδη από κάποια διπλωματική.
   const topicIsAssigned = Boolean(one('SELECT id FROM Thesis WHERE topicId = ?', topic.id));
   const editsTopicData = ['title', 'summary', 'toggle']
     .some((key) => Object.hasOwn(req.body || {}, key));
@@ -94,6 +100,7 @@ function updateTopic(req, res) {
   return res.json({ ok: true });
 }
 
+// Επιστρέφει handler που ελέγχει και συνδέει PDF περιγραφής με ένα θέμα.
 function uploadTopicDescription(uploadFolder) {
   return (req, res) => {
     const professor = currentProfessor(req.user.id);
@@ -110,12 +117,14 @@ function uploadTopicDescription(uploadFolder) {
   };
 }
 
+// Επιστρέφει μόνο φοιτητές χωρίς Thesis και διαθέσιμα θέματα του διδάσκοντα.
 function assignmentChoices(req, res) {
   const professor = currentProfessor(req.user.id);
   if (!professor) return res.status(404).json({ error: 'Invalid request.' });
 
   const query = cleanText(req.query.q);
   const searchPattern = `%${query}%`;
+  // Τα LEFT JOIN με Thesis και ο έλεγχος NULL αποκλείουν ήδη ανατεθειμένες εγγραφές.
   const students = query
     ? all(`SELECT Student.* FROM Student LEFT JOIN Thesis ON Thesis.studentId = Student.id WHERE Thesis.id IS NULL AND (Student.am LIKE ? OR Student.firstName LIKE ? OR Student.lastName LIKE ?) ORDER BY Student.am LIMIT 20`, searchPattern, searchPattern, searchPattern)
     : all('SELECT Student.* FROM Student LEFT JOIN Thesis ON Thesis.studentId = Student.id WHERE Thesis.id IS NULL ORDER BY Student.am LIMIT 20');
@@ -138,16 +147,19 @@ function assignmentChoices(req, res) {
   });
 }
 
+// Δημιουργεί την αρχική ανάθεση ανάμεσα σε έναν φοιτητή και ένα θέμα.
 function assignTopic(req, res) {
   const professor = currentProfessor(req.user.id);
   const student = one('SELECT * FROM Student WHERE id = ?', cleanText(req.body?.studentId));
   const topic = one('SELECT * FROM Topic WHERE id = ?', cleanText(req.body?.topicId));
 
+  // Αποτρέπει δεύτερη διπλωματική για τον ίδιο φοιτητή.
   const studentAlreadyHasThesis = student && one('SELECT id FROM Thesis WHERE studentId = ?', student.id);
   if (!student || studentAlreadyHasThesis) {
     return res.status(400).json({ error: 'Invalid request.' });
   }
 
+  // Αποτρέπει δεύτερη ανάθεση του ίδιου θέματος.
   const topicAlreadyAssigned = topic && one('SELECT id FROM Thesis WHERE topicId = ?', topic.id);
   const validTopic = professor
     && topic
@@ -159,6 +171,7 @@ function assignTopic(req, res) {
   const thesisId = newId();
   const timestamp = nowMs();
   try {
+    // Δημιουργία Thesis και πρώτη εγγραφή ιστορικού γίνονται ατομικά.
     transaction(() => {
       run(
         'INSERT INTO Thesis (id, studentId, supervisorId, topicId, status, createdAt, updatedAt, gradingOpen) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
@@ -178,6 +191,7 @@ function assignTopic(req, res) {
   return res.status(201).json({ ok: true, id: thesisId });
 }
 
+// Επιστρέφει τις διπλωματικές όπου ο καθηγητής συμμετέχει και εφαρμόζει φίλτρα.
 function listProfessorTheses(req, res) {
   const professor = currentProfessor(req.user.id);
   if (!professor) return res.json({ items: [] });
@@ -191,6 +205,7 @@ function listProfessorTheses(req, res) {
   return res.json({ items });
 }
 
+// Προετοιμάζει τις βασικές στήλες που χρησιμοποιούν οι εξαγωγές.
 function professorExportRows(professorId) {
   return participatedThesisIds(professorId).map((thesisId) => {
     const thesis = thesisData(thesisId, professorId, false);
@@ -205,6 +220,7 @@ function professorExportRows(professorId) {
   });
 }
 
+// Δημιουργεί και επιστρέφει αρχείο CSV με τις διπλωματικές του διδάσκοντα.
 function exportProfessorThesesCsv(req, res) {
   const professor = currentProfessor(req.user.id);
   if (!professor) return res.status(404).json({ error: 'Invalid request.' });
@@ -218,6 +234,7 @@ function exportProfessorThesesCsv(req, res) {
     .send(csv);
 }
 
+// Επιστρέφει τις ίδιες διπλωματικές σε αναλυτική μορφή JSON.
 function exportProfessorThesesJson(req, res) {
   const professor = currentProfessor(req.user.id);
   if (!professor) return res.status(404).json({ error: 'Invalid request.' });
@@ -227,12 +244,15 @@ function exportProfessorThesesJson(req, res) {
   return res.json({ items });
 }
 
+// Χωρίζει τα στατιστικά σε επιβλεπόμενες και συμμετοχές ως μέλος τριμελούς.
 function professorStatistics(req, res) {
   const professor = currentProfessor(req.user.id);
   if (!professor) return res.status(404).json({ error: 'Invalid request.' });
 
+  // Βρίσκει τις διπλωματικές όπου ο καθηγητής είναι επιβλέπων.
   const supervisedIds = all('SELECT id FROM Thesis WHERE supervisorId = ?', professor.id)
     .map((row) => row.id);
+  // Βρίσκει τις διπλωματικές όπου συμμετέχει μόνο ως μέλος τριμελούς.
   const committeeIds = all(`
     SELECT Thesis.id FROM Thesis
     JOIN CommitteeMember ON CommitteeMember.thesisId = Thesis.id
@@ -245,12 +265,14 @@ function professorStatistics(req, res) {
   });
 }
 
+// Επιστρέφει προσκλήσεις: όλες για φοιτητή, μόνο εκκρεμείς για καθηγητή.
 function listCommitteeInvitations(req, res) {
   if (req.user.role === 'STUDENT') {
     const student = currentStudent(req.user.id);
     const thesis = student ? one('SELECT id FROM Thesis WHERE studentId = ?', student.id) : null;
     if (!thesis) return res.json({ items: [] });
 
+    // Ενώνει κάθε πρόσκληση με τα στοιχεία του προσκεκλημένου καθηγητή.
     const invitations = all(`
       SELECT CommitteeInvitation.*, Professor.code, Professor.firstName, Professor.lastName
       FROM CommitteeInvitation JOIN Professor ON Professor.id = CommitteeInvitation.professorId
@@ -269,6 +291,7 @@ function listCommitteeInvitations(req, res) {
   const professor = currentProfessor(req.user.id);
   if (!professor) return res.json({ items: [] });
 
+  // Ενώνει πρόσκληση, θέμα, φοιτητή και επιβλέποντα για την κάρτα του frontend.
   const invitations = all(`
     SELECT CommitteeInvitation.*, Topic.title AS topic, Student.firstName AS studentFirst,
            Student.lastName AS studentLast, Supervisor.firstName AS supervisorFirst, Supervisor.lastName AS supervisorLast
@@ -292,6 +315,7 @@ function listCommitteeInvitations(req, res) {
   return res.json({ items });
 }
 
+// Αποδέχεται ή απορρίπτει πρόσκληση και ενεργοποιεί τη Thesis όταν συμπληρωθεί η τριμελής.
 function answerCommitteeInvitation(req, res) {
   const professor = currentProfessor(req.user.id);
   const invitation = one('SELECT * FROM CommitteeInvitation WHERE id = ?', cleanText(req.body?.id));
@@ -316,6 +340,7 @@ function answerCommitteeInvitation(req, res) {
     return res.json({ ok: true });
   }
 
+  // Μετρά τα υπάρχοντα μέλη, χωρίς τον επιβλέποντα, με μέγιστο τα δύο.
   const currentMemberCount = one(
     'SELECT COUNT(*) AS count FROM CommitteeMember WHERE thesisId = ?',
     thesis.id,
@@ -326,6 +351,7 @@ function answerCommitteeInvitation(req, res) {
   }
 
   try {
+    // Η απάντηση, η προσθήκη μέλους και η αλλαγή κατάστασης γίνονται ατομικά.
     transaction(() => {
       const timestamp = nowMs();
       run('UPDATE CommitteeInvitation SET status = ?, respondedAt = ? WHERE id = ?', 'ACCEPTED', timestamp, invitation.id);
@@ -355,6 +381,7 @@ function answerCommitteeInvitation(req, res) {
   return res.json({ ok: true });
 }
 
+// Επιστρέφει μόνο τις ιδιωτικές σημειώσεις του συγκεκριμένου καθηγητή.
 function listPrivateNotes(req, res) {
   const professor = currentProfessor(req.user.id);
   if (!professor || !isProfessorParticipant(req.params.id, professor.id)) {
@@ -369,6 +396,7 @@ function listPrivateNotes(req, res) {
   return res.json({ items });
 }
 
+// Προσθέτει νέα ιδιωτική σημείωση για μία διπλωματική.
 function addPrivateNote(req, res) {
   const professor = currentProfessor(req.user.id);
   if (!professor || !isProfessorParticipant(req.params.id, professor.id)) {
@@ -390,6 +418,7 @@ function addPrivateNote(req, res) {
   return res.status(201).json({ id: noteId });
 }
 
+// Εφαρμόζει τις επιτρεπόμενες μεταβάσεις κατάστασης του επιβλέποντα.
 function transitionThesis(req, res) {
   const thesis = one('SELECT * FROM Thesis WHERE id = ?', cleanText(req.body?.thesisId));
   if (!thesis) return res.status(404).json({ error: 'Thesis not found.' });
@@ -407,6 +436,7 @@ function transitionThesis(req, res) {
     if (thesis.status !== 'ACTIVE') {
       return res.status(409).json({ error: 'Thesis must be active.' });
     }
+    // Αλλάζει την κατάσταση και γράφει το γεγονός στο ιστορικό ως μία transaction.
     transaction(() => {
       run('UPDATE Thesis SET status = ?, updatedAt = ? WHERE id = ?', 'UNDER_EXAM', nowMs(), thesis.id);
       addHistory(thesis.id, thesis.status, 'UNDER_EXAM', req.user.id, 'Supervisor moved thesis to examination.');
@@ -456,6 +486,7 @@ function transitionThesis(req, res) {
   return res.json({ ok: true });
 }
 
+// Ελέγχει και αποθηκεύει τη βαθμολογία ενός μέλους της τριμελούς.
 function saveGrade(req, res) {
   const professor = currentProfessor(req.user.id);
   const thesis = one('SELECT * FROM Thesis WHERE id = ?', cleanText(req.body?.thesisId));
@@ -473,6 +504,7 @@ function saveGrade(req, res) {
   const criterionNames = ['written', 'presentation', 'overall'];
   const hasAllCriteria = criterionNames.every((name) => Object.hasOwn(criteria, name));
   if (hasAllCriteria) {
+    // Object.fromEntries δημιουργεί αριθμητικό αντικείμενο από τα τρία κριτήρια.
     criteria = Object.fromEntries(
       criterionNames.map((name) => [name, Number(criteria[name])]),
     );
@@ -492,11 +524,13 @@ function saveGrade(req, res) {
   }
 
   const comments = cleanText(req.body?.comments).slice(0, 2000);
+  // Βρίσκει αν ο ίδιος καθηγητής έχει ήδη βαθμολογήσει τη συγκεκριμένη Thesis.
   const existingGrade = one(
     'SELECT id FROM Grade WHERE thesisId = ? AND professorId = ?',
     thesis.id,
     professor.id,
   );
+  // Επιλέγει UPDATE για υπάρχοντα βαθμό ή INSERT για πρώτη καταχώριση.
   const timestamp = nowMs();
   if (existingGrade) {
     run(
@@ -522,6 +556,7 @@ function saveGrade(req, res) {
     );
   }
 
+  // Υπολογίζει τελικό μέσο όρο μόνο όταν έχουν καταχωριστεί τρεις έγκυροι βαθμοί.
   const validGrades = all('SELECT value FROM Grade WHERE thesisId = ?', thesis.id)
     .map((grade) => Number(grade.value))
     .filter((grade) => grade >= 0 && grade <= 10);
@@ -531,6 +566,7 @@ function saveGrade(req, res) {
   return res.json({ ok: true, gradesReceived: validGrades.length, finalGrade });
 }
 
+// Συνδέει τα professor URLs με handlers, uploads και έλεγχο ρόλου.
 export function registerProfessorRoutes(app, upload, uploadFolder) {
   app.get('/api/prof/topics', requireRole('PROFESSOR'), listTopics);
   app.post('/api/prof/topics', requireRole('PROFESSOR'), createTopic);

@@ -1,12 +1,14 @@
 const form = document.querySelector('#login-form');
 const errorNode = document.querySelector('#login-error');
 
+// Στέλνει τα στοιχεία σύνδεσης στο backend και μεταφέρει τον χρήστη στη σελίδα του ρόλου του.
 async function submitLogin(event) {
   event.preventDefault();
   errorNode.hidden = true;
   const button = form.querySelector('button');
   button.disabled = true;
   try {
+    // POST: στέλνει email και password στο /api/auth/login.
     const response = await fetch('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

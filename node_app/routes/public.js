@@ -1,6 +1,7 @@
 import { all, datetimeToMs, msToIso } from '../db.js';
 import { escapeXml } from './helpers.js';
 
+// Επιστρέφει τις δημόσιες παρουσιάσεις σε JSON ή XML με προαιρετικό εύρος ημερομηνιών.
 function publicPresentations(req, res) {
   const fromMs = req.query.from ? datetimeToMs(req.query.from) : null;
   const toMs = req.query.to ? datetimeToMs(req.query.to) : null;
@@ -19,6 +20,7 @@ function publicPresentations(req, res) {
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  // Ενώνει παρουσίαση, διπλωματική, φοιτητή, θέμα και επιβλέποντα σε ένα αποτέλεσμα.
   const rows = all(`
     SELECT PresentationDetails.*, Thesis.id AS thesisId, Student.am, Student.firstName AS studentFirst,
            Student.lastName AS studentLast, Topic.title AS topicTitle,
@@ -49,6 +51,7 @@ function publicPresentations(req, res) {
   if (format !== 'xml') return res.json({ items });
 
   const presentationsXml = items.map((item) => {
+    // Object.entries μετατρέπει κάθε πεδίο του αντικειμένου σε XML element.
     const fields = Object.entries(item)
       .filter(([key]) => key !== 'id')
       .map(([key, value]) => `<${key}>${escapeXml(value)}</${key}>`)
@@ -60,6 +63,7 @@ function publicPresentations(req, res) {
     .send(`<?xml version="1.0" encoding="utf-8"?><presentations>${presentationsXml}</presentations>`);
 }
 
+// Συνδέει το δημόσιο endpoint παρουσιάσεων με τον handler του.
 export function registerPublicRoutes(app) {
   app.get('/api/public/presentations', publicPresentations);
 }

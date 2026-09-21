@@ -6,6 +6,7 @@ export const STATUS_LABELS = {
   CANCELED: 'Ακυρωμένη',
 };
 
+// Μετατρέπει ειδικούς χαρακτήρες σε ασφαλές HTML πριν εμφανιστούν στη σελίδα.
 export function escapeHtml(value) {
   return String(value ?? '')
     .replaceAll('&', '&amp;')
@@ -15,6 +16,7 @@ export function escapeHtml(value) {
     .replaceAll("'", '&#039;');
 }
 
+// Δημιουργεί το κοινό επάνω τμήμα των dashboards.
 export function dashboardHero(label, title, description) {
   return `<section class="dashboard-hero">
     <div class="dashboard-hero-copy">
@@ -26,6 +28,7 @@ export function dashboardHero(label, title, description) {
   </section>`;
 }
 
+// Δημιουργεί μία επαναχρησιμοποιήσιμη κάρτα πλοήγησης.
 export function dashboardCard({ href, icon, title, description, tone = 'blue', external = false }) {
   return `<a class="card dashboard-link dashboard-tone-${escapeHtml(tone)}" href="${escapeHtml(href)}"${external ? ' target="_blank" rel="noreferrer"' : ''}>
     <span class="dashboard-icon" aria-hidden="true">${escapeHtml(icon)}</span>
@@ -37,16 +40,19 @@ export function dashboardCard({ href, icon, title, description, tone = 'blue', e
   </a>`;
 }
 
+// Μετατρέπει την εσωτερική κατάσταση της βάσης σε ορατό badge.
 export function statusBadge(status) {
   return `<span class="status status-${escapeHtml(status)}">${escapeHtml(STATUS_LABELS[status] || status)}</span>`;
 }
 
+// Εμφανίζει ημερομηνία της βάσης με ελληνική τοπική μορφή.
 export function formatDate(value) {
   if (!value) return '—';
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? escapeHtml(value) : date.toLocaleString('el-GR');
 }
 
+// Προσαρμόζει την ημερομηνία για input τύπου datetime-local.
 export function toLocalInput(value) {
   if (!value) return '';
   const date = new Date(value);
@@ -54,6 +60,7 @@ export function toLocalInput(value) {
   return new Date(date.getTime() - offset).toISOString().slice(0, 16);
 }
 
+// Εμφανίζει κοινό μήνυμα επιτυχίας ή σφάλματος στην κορυφή της σελίδας.
 export function showMessage(text, type = 'success') {
   const node = document.querySelector('#page-message');
   if (!node) return;
@@ -72,6 +79,7 @@ export function empty(text) {
   return `<div class="empty">${escapeHtml(text)}</div>`;
 }
 
+// Δημιουργεί την κοινή σύνοψη μιας διπλωματικής για καθηγητή ή γραμματεία.
 export function thesisSummary(thesis) {
   return `
     <div class="split">

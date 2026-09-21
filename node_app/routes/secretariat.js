@@ -18,6 +18,7 @@ import {
   validGradeCount,
 } from './helpers.js';
 
+// Επιστρέφει όλες τις διπλωματικές ή μόνο όσες έχουν την επιλεγμένη κατάσταση.
 function listTheses(req, res) {
   const status = cleanText(req.query.status, 'ALL');
   if (status !== 'ALL' && !THESIS_STATUSES.includes(status)) {
@@ -28,6 +29,7 @@ function listTheses(req, res) {
   return res.json({ items: thesisRows.map((row) => thesisData(row.id)) });
 }
 
+// Καταχωρίζει την επίσημη πράξη ΓΣ και την πρώτη ημερομηνία ανάθεσης.
 function recordAssignment(thesis, req, res) {
   if (thesis.status !== 'ACTIVE') {
     return res.status(409).json({ error: 'GS assignment is recorded for an active thesis.' });
@@ -39,6 +41,7 @@ function recordAssignment(thesis, req, res) {
     return res.status(400).json({ error: 'GS minutes number and year are required.' });
   }
 
+  // Η ενημέρωση Thesis και η εγγραφή ImportLog γίνονται ως μία transaction.
   transaction(() => {
     run(
       `UPDATE Thesis SET assignmentGsNumber = ?, assignmentGsYear = ?, officialAssignedAt = COALESCE(officialAssignedAt, ?)
@@ -59,6 +62,7 @@ function recordAssignment(thesis, req, res) {
   return res.json({ ok: true });
 }
 
+// Ακυρώνει ενεργή ή υπό εξέταση διπλωματική και γράφει το ιστορικό της.
 function cancelThesis(thesis, req, res) {
   if (!['ACTIVE', 'UNDER_EXAM'].includes(thesis.status)) {
     return res.status(409).json({ error: 'Only active or examined theses can be canceled.' });
@@ -85,6 +89,7 @@ function cancelThesis(thesis, req, res) {
   return res.json({ ok: true });
 }
 
+// Ολοκληρώνει Thesis μόνο με κατάσταση εξέτασης, τρεις βαθμούς και τελικό URL.
 function completeThesis(thesis, req, res) {
   const hasAllGrades = validGradeCount(thesis.id) === 3;
   const canComplete = thesis.status === 'UNDER_EXAM'
@@ -103,7 +108,9 @@ function completeThesis(thesis, req, res) {
   return res.json({ ok: true });
 }
 
+// Δρομολογεί το action του frontend στην αντίστοιχη διοικητική ενέργεια.
 function manageThesis(req, res) {
+  // Βρίσκει τη διπλωματική που έστειλε το frontend με thesisId.
   const thesis = one('SELECT * FROM Thesis WHERE id = ?', cleanText(req.body?.thesisId));
   if (!thesis) return res.status(404).json({ error: 'Thesis not found.' });
 
@@ -123,7 +130,9 @@ function manageThesis(req, res) {
   return res.status(400).json({ error: 'Invalid management action.' });
 }
 
+// Επιστρέφει τις παρουσιάσεις μαζί με βασικά στοιχεία κάθε διπλωματικής.
 function listPresentations(_req, res) {
+  // Αναζητά όλες τις παρουσιάσεις ταξινομημένες κατά ημερομηνία.
   const items = all('SELECT * FROM PresentationDetails ORDER BY date').map((presentation) => ({
     id: presentation.id,
     date: presentation.date,
@@ -136,6 +145,7 @@ function listPresentations(_req, res) {
   res.json({ items });
 }
 
+// Ενημερώνει ημερομηνία ή αίθουσα μιας υπάρχουσας παρουσίασης.
 function updatePresentation(req, res) {
   const presentation = one(
     'SELECT * FROM PresentationDetails WHERE id = ?',
@@ -159,6 +169,7 @@ function updatePresentation(req, res) {
   return res.json({ ok: true });
 }
 
+// Ελέγχει τη δομή και τα υποχρεωτικά πεδία του αρχείου people JSON.
 function validatePeopleImport(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return { bodyError: 'A JSON object is required.' };
@@ -180,7 +191,9 @@ function validatePeopleImport(body) {
   return { students, professors, errors };
 }
 
+// Υπολογίζει πόσες εγγραφές θα προστεθούν και πόσες θα ενημερωθούν.
 function buildPeopleImportReport(students, professors) {
+  // Αναζητά ΑΜ που υπάρχουν ήδη στον πίνακα Student.
   const existingStudentAms = new Set(students
     .filter((row) => one('SELECT id FROM Student WHERE am = ?', cleanText(row.am)))
     .map((row) => cleanText(row.am)));
@@ -204,6 +217,7 @@ function buildPeopleImportReport(students, professors) {
   };
 }
 
+// Ενημερώνει υπάρχοντα φοιτητή ή δημιουργεί νέο User και Student.
 function upsertStudent(row, passwordHash) {
   const am = cleanText(row.am);
   const existingStudent = one('SELECT * FROM Student WHERE am = ?', am);
@@ -242,6 +256,7 @@ function upsertStudent(row, passwordHash) {
   );
 }
 
+// Ενημερώνει υπάρχοντα διδάσκοντα ή δημιουργεί νέο User και Professor.
 function upsertProfessor(row, passwordHash) {
   const code = cleanText(row.code);
   const existingProfessor = one('SELECT * FROM Professor WHERE code = ?', code);
@@ -280,6 +295,7 @@ function upsertProfessor(row, passwordHash) {
   );
 }
 
+// Ελέγχει, προεπισκοπεί ή εισάγει μαζικά φοιτητές και διδάσκοντες.
 async function importPeople(req, res) {
   const validation = validatePeopleImport(req.body);
   if (validation.bodyError) return res.status(400).json({ error: validation.bodyError });
@@ -292,10 +308,12 @@ async function importPeople(req, res) {
 
   const { students, professors } = validation;
   const report = buildPeopleImportReport(students, professors);
+  // Με dryRun=1 επιστρέφει την αναφορά χωρίς καμία αλλαγή στη βάση.
   if (cleanText(req.query.dryRun) === '1') return res.json({ report });
 
   const passwordHash = await bcrypt.hash('password', 10);
   try {
+    // Όλες οι εγγραφές και το ImportLog αποθηκεύονται ή ακυρώνονται μαζί.
     transaction(() => {
       students.forEach((student) => upsertStudent(student, passwordHash));
       professors.forEach((professor) => upsertProfessor(professor, passwordHash));
@@ -313,6 +331,7 @@ async function importPeople(req, res) {
   return res.json({ report });
 }
 
+// Ενημερώνει την ακαδημαϊκή κατάσταση φοιτητών με αντιστοίχιση στον ΑΜ.
 function importAcademicStatus(req, res) {
   const rows = Array.isArray(req.body?.academic_status) ? req.body.academic_status : [];
   let updated = 0;
@@ -327,6 +346,7 @@ function importAcademicStatus(req, res) {
         return;
       }
 
+      // Βρίσκει τον φοιτητή της εισαγόμενης γραμμής από τον ΑΜ.
       const student = one('SELECT id FROM Student WHERE am = ?', am);
       if (!student) {
         notFound.push(am);
@@ -351,6 +371,7 @@ function importAcademicStatus(req, res) {
   return res.json({ updated, notFound, errors });
 }
 
+// Συνδέει τα URLs γραμματείας με handlers και έλεγχο ρόλου.
 export function registerSecretariatRoutes(app) {
   app.get('/api/admin/theses', requireRole('SECRETARIAT'), listTheses);
   app.patch('/api/admin/theses', requireRole('SECRETARIAT'), manageThesis);

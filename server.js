@@ -13,6 +13,7 @@ const STATIC_FOLDER = path.join(ROOT, 'web', 'static');
 const UPLOAD_FOLDER = path.join(ROOT, 'uploads');
 fs.mkdirSync(UPLOAD_FOLDER, { recursive: true });
 
+// Δημιουργεί και ρυθμίζει ολόκληρη την εφαρμογή Express.
 export function createApp() {
   const app = express();
   app.disable('x-powered-by');
@@ -25,9 +26,10 @@ export function createApp() {
     saveUninitialized: false,
     cookie: { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', maxAge: 8 * 60 * 60 * 1000 },
   }));
+  // Συνδέει κάθε request με τον χρήστη που υπάρχει στο session.
   app.use(loadUser);
 
-  // Apply the same security policy to pages, APIs and static files.
+  // Εφαρμόζει την ίδια πολιτική ασφαλείας σε σελίδες, APIs και στατικά αρχεία.
   app.use((req, res, next) => {
     res.set({
       'X-Content-Type-Options': 'nosniff',
@@ -39,7 +41,7 @@ export function createApp() {
   });
   app.use(verifyCsrf);
 
-  // Cache versioned front-end assets longer than uploaded documents.
+  // Κρατά τα versioned αρχεία frontend περισσότερο στην cache από τα uploads.
   app.use('/static', express.static(STATIC_FOLDER, {
     etag: true,
     lastModified: true,
@@ -60,6 +62,7 @@ export function createApp() {
   app.get('/', (req, res) => res.redirect(req.user ? roleHome(req.user.role) : '/auth/login'));
 
   for (const [route, pageDefinition] of Object.entries(PAGE_DEFINITIONS)) {
+    // Το destructuring δίνει όνομα στα τρία στοιχεία κάθε ορισμού σελίδας.
     const [allowedRole, pageTitle, pageKey] = pageDefinition;
     app.get(route, requirePageRole(allowedRole), (req, res) => {
       const html = workspacePage(req.user, pageTitle, pageKey, req.session.csrfToken);
@@ -71,6 +74,7 @@ export function createApp() {
     storage: multer.memoryStorage(),
     limits: { fileSize: 12 * 1024 * 1024, files: 1 },
   });
+  // Συνδέει όλα τα API routes με την εφαρμογή και τον μηχανισμό upload.
   registerRoutes(app, upload, UPLOAD_FOLDER);
 
   app.use((req, res) => {
@@ -88,6 +92,7 @@ export function createApp() {
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  // Ξεκινά HTTP server μόνο όταν το αρχείο εκτελείται άμεσα, όχι στα tests.
   const port = Number(process.env.PORT || 5000);
   createApp().listen(port, '127.0.0.1', () => {
     console.log(`ThesisFlow running at http://127.0.0.1:${port}`);

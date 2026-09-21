@@ -5,6 +5,7 @@ import { DatabaseSync } from 'node:sqlite';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+// Επιλέγει το αρχείο SQLite από το DATABASE_URL ή χρησιμοποιεί το data/dev.db.
 function databasePath() {
   const configured = (process.env.DATABASE_URL || '').trim();
   if (configured.startsWith('file:')) return path.resolve(ROOT, 'data', configured.slice(5));
@@ -16,20 +17,23 @@ export const db = new DatabaseSync(databasePath());
 db.exec('PRAGMA foreign_keys = ON');
 db.exec('PRAGMA journal_mode = WAL');
 
+// Επιστρέφει όλες τις γραμμές ενός SELECT ως απλά αντικείμενα JavaScript.
 export function all(sql, ...params) {
   return db.prepare(sql).all(...params).map((row) => ({ ...row }));
 }
 
+// Επιστρέφει μία γραμμή SELECT ή null όταν δεν βρεθεί αποτέλεσμα.
 export function one(sql, ...params) {
   const row = db.prepare(sql).get(...params);
   return row ? { ...row } : null;
 }
 
+// Εκτελεί INSERT, UPDATE ή DELETE με δεσμευμένες παραμέτρους.
 export function run(sql, ...params) {
   return db.prepare(sql).run(...params);
 }
 
-// Keep multi-query workflow changes atomic.
+// Εκτελεί πολλά queries ως μία ατομική συναλλαγή: όλα ή κανένα.
 export function transaction(work) {
   db.exec('BEGIN IMMEDIATE');
   try {
@@ -50,6 +54,7 @@ export function nowMs() {
   return Date.now();
 }
 
+// Μετατρέπει διαφορετικές μορφές ημερομηνίας σε milliseconds.
 export function datetimeToMs(value) {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
@@ -64,6 +69,7 @@ export function msToIso(value) {
   return ms === null ? null : new Date(ms).toISOString();
 }
 
+// Ελέγχει ότι μία τιμή είναι πλήρες HTTP ή HTTPS URL.
 export function isHttpUrl(value) {
   try {
     const url = new URL(String(value));
@@ -73,6 +79,7 @@ export function isHttpUrl(value) {
   }
 }
 
+// Μετατρέπει εγγραφή Professor στη μορφή που επιστρέφει το API.
 export function professorData(professor) {
   if (!professor) return null;
   return {
@@ -84,10 +91,12 @@ export function professorData(professor) {
   };
 }
 
+// Βρίσκει τον καθηγητή που αντιστοιχεί στον συνδεδεμένο χρήστη.
 export function currentProfessor(userId) {
   return one('SELECT * FROM Professor WHERE userId = ?', userId);
 }
 
+// Βρίσκει τον φοιτητή και ενώνει το email του από τον πίνακα User.
 export function currentStudent(userId) {
   return one(`
     SELECT Student.*, User.email
@@ -96,6 +105,7 @@ export function currentStudent(userId) {
   `, userId);
 }
 
+// Βρίσκει διπλωματικές όπου ο καθηγητής είναι επιβλέπων ή μέλος τριμελούς.
 export function participatedThesisIds(professorId) {
   return all(`
     SELECT DISTINCT Thesis.id, Thesis.createdAt
@@ -106,6 +116,7 @@ export function participatedThesisIds(professorId) {
   `, professorId, professorId).map((row) => row.id);
 }
 
+// Μετατρέπει το αποθηκευμένο criteriaJson σε αντικείμενο βαθμολογικών κριτηρίων.
 function gradeData(grade) {
   let criteria = {};
   try { criteria = JSON.parse(grade.criteriaJson || '{}'); } catch { criteria = {}; }
@@ -121,7 +132,7 @@ function gradeData(grade) {
   };
 }
 
-// Build the API view of a thesis from the normalized database tables.
+// Συνθέτει το αντικείμενο API μιας διπλωματικής από τους κανονικοποιημένους πίνακες.
 export function thesisData(thesisOrId, viewerProfessorId = null, detailed = true) {
   const thesis = typeof thesisOrId === 'string'
     ? one('SELECT * FROM Thesis WHERE id = ?', thesisOrId)
@@ -141,6 +152,7 @@ export function thesisData(thesisOrId, viewerProfessorId = null, detailed = true
     FROM Grade JOIN Professor ON Professor.id = Grade.professorId
     WHERE Grade.thesisId = ? ORDER BY Grade.createdAt
   `, thesis.id);
+  // map μετατρέπει κάθε γραμμή Grade στη μορφή που χρειάζεται το frontend.
   const grades = gradeRows.map(gradeData);
   const validGrades = grades.map((item) => Number(item.value)).filter((value) => value >= 0 && value <= 10);
   const presentation = one('SELECT * FROM PresentationDetails WHERE thesisId = ?', thesis.id);
@@ -165,6 +177,7 @@ export function thesisData(thesisOrId, viewerProfessorId = null, detailed = true
     draftUrl: thesis.draftUrl,
     finalRepositoryUrl: thesis.finalRepositoryUrl,
     gradingOpen: Boolean(thesis.gradingOpen),
+    // Υπολογίζει τελικό βαθμό μόνο όταν υπάρχουν ακριβώς τρεις έγκυροι βαθμοί.
     finalGrade: validGrades.length === 3
       ? Math.round((validGrades.reduce((sum, value) => sum + value, 0) / 3) * 100) / 100
       : null,
@@ -193,6 +206,7 @@ export function thesisData(thesisOrId, viewerProfessorId = null, detailed = true
     } : null,
   };
 
+  // Τα αναλυτικά δεδομένα φορτώνονται μόνο όπου χρειάζονται στο UI.
   if (detailed) {
     result.grades = grades;
     result.materials = all('SELECT * FROM ThesisMaterial WHERE thesisId = ? ORDER BY createdAt', thesis.id)
@@ -225,6 +239,7 @@ export function thesisData(thesisOrId, viewerProfessorId = null, detailed = true
   return result;
 }
 
+// Καταγράφει κάθε αλλαγή κατάστασης στο ιστορικό της διπλωματικής.
 export function addHistory(thesisId, fromStatus, toStatus, actorUserId, note) {
   run(`
     INSERT INTO ThesisHistory (id, thesisId, fromStatus, toStatus, actorUserId, note, createdAt)
@@ -232,7 +247,7 @@ export function addHistory(thesisId, fromStatus, toStatus, actorUserId, note) {
   `, newId(), thesisId, fromStatus, toStatus, actorUserId, note, nowMs());
 }
 
-// These indexes support the filters and joins used by the dashboards.
+// Τα indexes επιταχύνουν τα φίλτρα και τα JOIN που χρησιμοποιούν τα dashboards.
 export function ensureIndexes() {
   db.exec(`
     CREATE INDEX IF NOT EXISTS Topic_supervisor_status_idx ON Topic(supervisorId, status);

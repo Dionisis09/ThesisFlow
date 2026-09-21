@@ -19,10 +19,12 @@ import {
   validGradeCount,
 } from './helpers.js';
 
+// Επιστρέφει τη διπλωματική του συνδεδεμένου φοιτητή με όλα τα αναλυτικά στοιχεία.
 function getStudentThesis(req, res) {
   const student = currentStudent(req.user.id);
   if (!student) return res.status(404).json({ error: 'Invalid request.' });
 
+  // Αναζητά αν ο φοιτητής έχει ήδη εγγραφή Thesis.
   const thesis = one('SELECT id FROM Thesis WHERE studentId = ?', student.id);
   return res.json({
     student: {
@@ -36,6 +38,7 @@ function getStudentThesis(req, res) {
   });
 }
 
+// Επιστρέφει τα στοιχεία επικοινωνίας του φοιτητή.
 function getStudentProfile(req, res) {
   const student = currentStudent(req.user.id);
   if (!student) return res.status(404).json({ error: 'Invalid request.' });
@@ -48,6 +51,7 @@ function getStudentProfile(req, res) {
   });
 }
 
+// Ελέγχει και ενημερώνει προφίλ και email μέσα στην ίδια συναλλαγή.
 function updateStudentProfile(req, res) {
   const student = currentStudent(req.user.id);
   if (!student) return res.status(404).json({ error: 'Invalid request.' });
@@ -57,6 +61,7 @@ function updateStudentProfile(req, res) {
     return res.status(400).json({ error: 'Invalid request.' });
   }
 
+  // Ελέγχει ότι το νέο email δεν χρησιμοποιείται από διαφορετικό χρήστη.
   const existingUser = one('SELECT id FROM User WHERE email = ?', email);
   if (existingUser && existingUser.id !== student.userId) {
     return res.status(409).json({ error: 'Invalid request.' });
@@ -78,11 +83,13 @@ function updateStudentProfile(req, res) {
   return res.json({ ok: true });
 }
 
+// Επιστρέφει τους διαθέσιμους διδάσκοντες ταξινομημένους κατά κωδικό.
 function listProfessors(_req, res) {
   const professors = all('SELECT * FROM Professor ORDER BY code').map(professorData);
   res.json({ items: professors });
 }
 
+// Δημιουργεί ή επαναφέρει σε εκκρεμότητα τις προσκλήσεις τριμελούς.
 function createCommitteeInvitations(req, res) {
   const student = currentStudent(req.user.id);
   const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
@@ -95,12 +102,14 @@ function createCommitteeInvitations(req, res) {
   if (!professorCodes.length) return res.status(400).json({ error: 'Invalid request.' });
 
   const placeholders = professorCodes.map(() => '?').join(',');
+  // Αναζητά μόνο τους κωδικούς που έστειλε το frontend και αφαιρεί τον επιβλέποντα.
   const professors = all(
     `SELECT * FROM Professor WHERE code IN (${placeholders})`,
     ...professorCodes,
   ).filter((professor) => professor.id !== thesis.supervisorId);
   if (!professors.length) return res.status(400).json({ error: 'Invalid request.' });
 
+  // Η transaction εγγυάται ότι όλες οι προσκλήσεις αποθηκεύονται μαζί.
   const createdInvitations = transaction(() => professors.flatMap((professor) => {
     const invitation = one(
       'SELECT * FROM CommitteeInvitation WHERE thesisId = ? AND professorId = ?',
@@ -136,6 +145,7 @@ function createCommitteeInvitations(req, res) {
   });
 }
 
+// Επιστρέφει handler που αποθηκεύει το πρόχειρο PDF της διπλωματικής.
 function uploadThesisDraft(uploadFolder) {
   return (req, res) => {
     const student = currentStudent(req.user.id);
@@ -153,6 +163,7 @@ function uploadThesisDraft(uploadFolder) {
   };
 }
 
+// Αποθηκεύει σύνδεσμο υποστηρικτικού υλικού για διπλωματική υπό εξέταση.
 function addThesisMaterial(req, res) {
   const student = currentStudent(req.user.id);
   const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
@@ -168,6 +179,7 @@ function addThesisMaterial(req, res) {
   }
 
   const materialId = newId();
+  // Προσθέτει νέο υλικό με περιγραφή, URL και χρόνο δημιουργίας.
   run(
     'INSERT INTO ThesisMaterial (id, thesisId, label, url, createdAt) VALUES (?, ?, ?, ?, ?)',
     materialId,
@@ -179,6 +191,7 @@ function addThesisMaterial(req, res) {
   return res.status(201).json({ id: materialId });
 }
 
+// Δημιουργεί ή ενημερώνει τα στοιχεία παρουσίασης του φοιτητή.
 function savePresentation(req, res) {
   const student = currentStudent(req.user.id);
   const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
@@ -201,6 +214,7 @@ function savePresentation(req, res) {
     return res.status(400).json({ error: 'Invalid request.' });
   }
 
+  // Ελέγχει αν υπάρχει ήδη παρουσίαση ώστε να επιλέξει UPDATE ή INSERT.
   const existing = one('SELECT id FROM PresentationDetails WHERE thesisId = ?', thesis.id);
   const presentationId = existing?.id || newId();
   const shownRoom = mode === 'IN_PERSON' ? room : 'Online';
@@ -235,6 +249,7 @@ function savePresentation(req, res) {
   return res.json({ id: presentationId });
 }
 
+// Αποθηκεύει το τελικό repository μόνο μετά από τρεις έγκυρους βαθμούς.
 function saveFinalRepository(req, res) {
   const student = currentStudent(req.user.id);
   const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
@@ -251,6 +266,7 @@ function saveFinalRepository(req, res) {
   return res.json({ ok: true });
 }
 
+// Συνδέει τα student URLs με handlers και έλεγχο ρόλου.
 export function registerStudentRoutes(app, upload, uploadFolder) {
   app.get('/api/student/thesis', requireRole('STUDENT'), getStudentThesis);
   app.get('/api/student/profile', requireRole('STUDENT'), getStudentProfile);

@@ -4,6 +4,7 @@ import { dashboardCard, dashboardHero, empty, escapeHtml, formatDate, showMessag
 const content = () => document.querySelector('#page-content');
 const currentYear = new Date().getFullYear();
 
+// Δημιουργεί την αρχική σελίδα και τις βασικές επιλογές της γραμματείας.
 function dashboard() {
   const cards = [
     { href: '/admin/theses', icon: 'ΔΕ', title: 'Διπλωματικές', description: 'Πρακτικά ανάθεσης, ακυρώσεις και περάτωση.', tone: 'blue' },
@@ -18,6 +19,7 @@ function dashboard() {
     <div class="grid dashboard-grid">${cards.map(dashboardCard).join('')}</div>`;
 }
 
+// Επιλέγει τις επιτρεπόμενες διοικητικές ενέργειες από την κατάσταση της διπλωματικής.
 function managementControls(thesis) {
   const blocks = [];
   if (thesis.status === 'ACTIVE') {
@@ -46,6 +48,7 @@ function managementControls(thesis) {
   return blocks.join('');
 }
 
+// Μετατρέπει μία διπλωματική σε κάρτα διαχείρισης της γραμματείας.
 function adminThesisCard(thesis) {
   return `<article class="card" data-thesis="${escapeHtml(thesis.id)}">
     ${thesisSummary(thesis)}
@@ -59,12 +62,14 @@ function adminThesisCard(thesis) {
   </article>`;
 }
 
+// Φορτώνει τις διπλωματικές και εφαρμόζει το επιλεγμένο φίλτρο κατάστασης.
 async function theses() {
   content().innerHTML = `<div class="card inline"><label>Κατάσταση<select id="status-filter">
     <option value="ALL">Όλες</option><option value="UNDER_ASSIGNMENT">Υπό ανάθεση</option><option value="ACTIVE">Ενεργές</option><option value="UNDER_EXAM">Υπό εξέταση</option><option value="COMPLETED">Περατωμένες</option><option value="CANCELED">Ακυρωμένες</option>
   </select></label></div><div id="admin-thesis-list" class="section"></div>`;
   const load = async () => {
     const selectedStatus = document.querySelector('#status-filter').value;
+    // GET: ζητά τις διπλωματικές της επιλεγμένης κατάστασης.
     const data = await api(`/api/admin/theses?status=${selectedStatus}`);
     const list = document.querySelector('#admin-thesis-list');
     list.innerHTML = data.items.length ? data.items.map(adminThesisCard).join('') : empty('Δεν βρέθηκαν διπλωματικές.');
@@ -74,10 +79,12 @@ async function theses() {
   await load();
 }
 
+// Ολοκληρώνει τη διπλωματική όταν υπάρχουν τρεις βαθμοί και τελικό κείμενο.
 async function completeThesis(event, thesisId, reload) {
   const action = event.target.dataset.action;
   if (action !== 'complete') return;
   try {
+    // PATCH: στέλνει thesisId και action complete.
     await api('/api/admin/theses', { method: 'PATCH', body: { thesisId, action } });
     showMessage('Η κατάσταση ενημερώθηκε.');
     await reload();
@@ -86,10 +93,12 @@ async function completeThesis(event, thesisId, reload) {
   }
 }
 
+// Καταχωρίζει τον αριθμό και το έτος της επίσημης απόφασης ανάθεσης.
 async function recordAssignment(event, thesisId, reload) {
   event.preventDefault();
   const form = event.currentTarget;
   try {
+    // PATCH: στέλνει τα στοιχεία της πράξης ΓΣ για την ανάθεση.
     await api('/api/admin/theses', {
       method: 'PATCH',
       body: {
@@ -106,12 +115,14 @@ async function recordAssignment(event, thesisId, reload) {
   }
 }
 
+// Ακυρώνει διοικητικά μία διπλωματική και καταγράφει την αιτιολογία.
 async function cancelThesis(event, thesisId, reload) {
   event.preventDefault();
   const form = event.currentTarget;
   if (!confirm('Να ακυρωθεί οριστικά η διπλωματική;')) return;
 
   try {
+    // PATCH: στέλνει πράξη ΓΣ, έτος και λόγο ακύρωσης.
     await api('/api/admin/theses', {
       method: 'PATCH',
       body: {
@@ -129,6 +140,7 @@ async function cancelThesis(event, thesisId, reload) {
   }
 }
 
+// Συνδέει τις φόρμες κάθε κάρτας με τις αντίστοιχες διοικητικές ενέργειες.
 function bindManagement(reload) {
   content().querySelectorAll('[data-thesis]').forEach((card) => {
     const thesisId = card.dataset.thesis;
@@ -144,10 +156,12 @@ function bindManagement(reload) {
   });
 }
 
+// Ενημερώνει ημερομηνία και αίθουσα μιας παρουσίασης.
 async function updatePresentation(event) {
   event.preventDefault();
   const form = event.currentTarget;
   try {
+    // PATCH: στέλνει id παρουσίασης, νέα ημερομηνία και αίθουσα.
     await api('/api/admin/presentations', {
       method: 'PATCH',
       body: {
@@ -162,7 +176,9 @@ async function updatePresentation(event) {
   }
 }
 
+// Φορτώνει όλες τις παρουσιάσεις για έλεγχο από τη γραμματεία.
 async function presentations() {
+  // GET: παίρνει τις παρουσιάσεις μαζί με τα στοιχεία των διπλωματικών.
   const data = await api('/api/admin/presentations');
   content().innerHTML = data.items.length ? data.items.map((item) => `<form class="card form-grid" data-presentation="${escapeHtml(item.id)}">
     <div class="full split"><div><h3>${escapeHtml(item.thesis.topic.title)}</h3><p class="muted">${escapeHtml(item.thesis.student.fullName)} · ${escapeHtml(item.thesis.supervisor.fullName)}</p></div>${statusBadge(item.thesis.status)}</div>
@@ -175,28 +191,33 @@ async function presentations() {
   });
 }
 
+// Διαβάζει το επιλεγμένο τοπικό αρχείο και μετατρέπει το JSON σε αντικείμενο.
 function readJsonFile(input) {
   const file = input.files[0];
   if (!file) return Promise.resolve(null);
   return file.text().then((text) => JSON.parse(text));
 }
 
+// Βρίσκει ένα file input και επιστρέφει το περιεχόμενο JSON του.
 function selectedJsonFile(inputSelector) {
   const input = document.querySelector(inputSelector);
   return readJsonFile(input);
 }
 
+// Εμφανίζει την αναφορά εισαγωγής σε μορφοποιημένο JSON.
 function showImportReport(value) {
   const reportSection = document.querySelector('#import-report');
   reportSection.hidden = false;
   reportSection.querySelector('pre').textContent = JSON.stringify(value, null, 2);
 }
 
+// Ελέγχει το αρχείο προσώπων χωρίς να γράψει δεδομένα στη βάση.
 async function previewPeopleImport() {
   try {
     const peoplePayload = await selectedJsonFile('#people-file');
     if (!peoplePayload) throw new Error('Επιλέξτε People JSON.');
 
+    // POST dryRun: ζητά μόνο έλεγχο και αναφορά, χωρίς εισαγωγή.
     const preview = await api('/api/admin/import/people?dryRun=1', {
       method: 'POST',
       body: peoplePayload,
@@ -208,11 +229,13 @@ async function previewPeopleImport() {
   }
 }
 
+// Εκτελεί την πραγματική εισαγωγή προσώπων και προαιρετικά ακαδημαϊκής κατάστασης.
 async function submitDataImport() {
   try {
     const peoplePayload = await selectedJsonFile('#people-file');
     if (!peoplePayload) throw new Error('Επιλέξτε People JSON.');
 
+    // POST: εισάγει ή ενημερώνει φοιτητές και διδάσκοντες.
     const peopleResult = await api('/api/admin/import/people', {
       method: 'POST',
       body: peoplePayload,
@@ -221,6 +244,7 @@ async function submitDataImport() {
 
     const academicPayload = await selectedJsonFile('#academic-file');
     if (academicPayload) {
+      // POST: ενημερώνει την ακαδημαϊκή κατάσταση με βάση τον ΑΜ.
       result.academic = await api('/api/admin/import/academic-status', {
         method: 'POST',
         body: academicPayload,
@@ -234,6 +258,7 @@ async function submitDataImport() {
   }
 }
 
+// Δημιουργεί τη σελίδα εισαγωγής και συνδέει τα δύο κουμπιά.
 async function importData() {
   content().innerHTML = `<section class="card stack">
     <h2>Αρχεία εισαγωγής JSON</h2>
@@ -245,6 +270,7 @@ async function importData() {
   document.querySelector('#import-button').addEventListener('click', submitDataImport);
 }
 
+// Επιλέγει τη σωστή σελίδα γραμματείας από το page key του main.js.
 export async function renderAdmin(page) {
   const renderers = {
     'admin-dashboard': dashboard,

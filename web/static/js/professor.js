@@ -3,6 +3,7 @@ import { STATUS_LABELS, dashboardCard, dashboardHero, empty, escapeHtml, formatD
 
 const content = () => document.querySelector('#page-content');
 
+// Δημιουργεί την αρχική σελίδα και τις βασικές επιλογές του διδάσκοντα.
 function dashboard() {
   const cards = [
     { href: '/prof/topics', icon: 'ΘΕ', title: 'Θέματα', description: 'Δημιουργία, επεξεργασία και PDF περιγραφής.', tone: 'blue' },
@@ -23,10 +24,12 @@ function dashboard() {
     </div>`;
 }
 
+// Δημιουργεί νέο θέμα από τα στοιχεία της φόρμας.
 async function createTopic(event) {
   event.preventDefault();
   const form = event.currentTarget;
   try {
+    // POST: στέλνει τίτλο και σύνοψη για δημιουργία θέματος.
     await api('/api/prof/topics', {
       method: 'POST',
       body: { title: form.title.value, summary: form.summary.value },
@@ -38,6 +41,7 @@ async function createTopic(event) {
   }
 }
 
+// Χειρίζεται δημοσίευση/απόκρυψη θέματος και ανέβασμα του PDF περιγραφής.
 async function handleTopicAction(event) {
   const action = event.target.dataset.action;
   if (!action) return;
@@ -45,6 +49,7 @@ async function handleTopicAction(event) {
   const card = event.currentTarget;
   try {
     if (action === 'toggle') {
+      // PATCH: ζητά από το backend να αλλάξει τη διαθεσιμότητα του θέματος.
       await api(`/api/prof/topics/${card.dataset.topic}`, {
         method: 'PATCH',
         body: { toggle: true },
@@ -57,6 +62,7 @@ async function handleTopicAction(event) {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('topicId', card.dataset.topic);
+      // POST multipart: ανεβάζει το PDF μαζί με το id του θέματος.
       await api('/api/upload/topic-description', { method: 'POST', body: formData });
     }
     showMessage('Η αλλαγή αποθηκεύτηκε.');
@@ -66,11 +72,13 @@ async function handleTopicAction(event) {
   }
 }
 
+// Αποθηκεύει τις αλλαγές τίτλου και σύνοψης ενός μη ανατεθειμένου θέματος.
 async function updateTopic(event) {
   event.preventDefault();
   const form = event.currentTarget;
   const card = form.closest('[data-topic]');
   try {
+    // PATCH: ενημερώνει το θέμα που αναγνωρίζεται από το URL.
     await api(`/api/prof/topics/${card.dataset.topic}`, {
       method: 'PATCH',
       body: { title: form.title.value, summary: form.summary.value },
@@ -82,7 +90,9 @@ async function updateTopic(event) {
   }
 }
 
+// Φορτώνει τα θέματα από το backend και συνδέει τις φόρμες με τους handlers τους.
 async function topics() {
+  // GET: παίρνει όλα τα θέματα του συνδεδεμένου διδάσκοντα.
   const data = await api('/api/prof/topics');
   content().innerHTML = `
     <form id="topic-form" class="card form-grid">
@@ -115,10 +125,12 @@ async function topics() {
   });
 }
 
+// Στέλνει το επιλεγμένο ζεύγος φοιτητή και θέματος για αρχική ανάθεση.
 async function submitAssignment(event, reloadChoices) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
   try {
+    // POST: στέλνει studentId και topicId για δημιουργία ανάθεσης.
     await api('/api/prof/assign', {
       method: 'POST',
       body: {
@@ -133,8 +145,10 @@ async function submitAssignment(event, reloadChoices) {
   }
 }
 
+// Ζητά και εμφανίζει μόνο τους διαθέσιμους φοιτητές και τα διαθέσιμα θέματα.
 async function renderAssignmentChoices(searchForm) {
   const query = encodeURIComponent(searchForm.q.value);
+  // GET: περνά το κείμενο αναζήτησης ως query parameter q.
   const data = await api(`/api/prof/assign?q=${query}`);
   document.querySelector('#assign-results').innerHTML = `<form id="assign-form" class="stack">
       <div class="grid grid-2">
@@ -147,6 +161,7 @@ async function renderAssignmentChoices(searchForm) {
   });
 }
 
+// Δημιουργεί τη σελίδα αρχικής ανάθεσης και ενεργοποιεί την αναζήτηση.
 async function assign() {
   content().innerHTML = `<form id="search-form" class="card inline">
     <input class="compact-input" name="q" placeholder="ΑΜ, όνομα ή θέμα"><button class="button button-secondary">Αναζήτηση</button>
@@ -160,6 +175,7 @@ async function assign() {
   await renderAssignmentChoices(searchForm);
 }
 
+// Επιλέγει ποιες ενέργειες επιτρέπονται από τον ρόλο και την κατάσταση της διπλωματικής.
 function thesisActions(thesis) {
   const actions = [];
   if (thesis.role === 'SUPERVISOR' && thesis.status === 'UNDER_ASSIGNMENT') {
@@ -190,6 +206,7 @@ function thesisActions(thesis) {
   return actions.join('');
 }
 
+// Μετατρέπει τα δεδομένα μιας διπλωματικής σε κάρτα του dashboard.
 function thesisCard(thesis) {
   const members = thesis.members?.map((member) => member.fullName).join(', ') || 'Δεν έχει συμπληρωθεί';
   const gradeCount = thesis.grades?.filter((item) => item.value >= 0 && item.value <= 10).length || 0;
@@ -214,6 +231,7 @@ function thesisCard(thesis) {
   </article>`;
 }
 
+// Φορτώνει τις διπλωματικές του διδάσκοντα με τα επιλεγμένα φίλτρα.
 async function theses() {
   content().innerHTML = `<div class="card inline">
     <label>Κατάσταση<select id="status-filter"><option value="ALL">Όλες</option><option value="UNDER_ASSIGNMENT">Υπό ανάθεση</option><option value="ACTIVE">Ενεργές</option><option value="UNDER_EXAM">Υπό εξέταση</option><option value="COMPLETED">Περατωμένες</option><option value="CANCELED">Ακυρωμένες</option></select></label>
@@ -223,6 +241,7 @@ async function theses() {
   const load = async () => {
     const status = document.querySelector('#status-filter').value;
     const role = document.querySelector('#role-filter').value;
+    // GET: ζητά τις διπλωματικές με φίλτρο κατάστασης και ρόλου.
     const data = await api(`/api/prof/theses?status=${status}&role=${role}`);
     const list = document.querySelector('#thesis-list');
     list.innerHTML = data.items.length ? data.items.map(thesisCard).join('') : empty('Δεν βρέθηκαν διπλωματικές.');
@@ -233,6 +252,7 @@ async function theses() {
   await load();
 }
 
+// Συνδέει κάθε κουμπί και φόρμα μιας κάρτας με τη σωστή named function.
 function bindThesisActions(reload) {
   content().querySelectorAll('[data-thesis]').forEach((card) => {
     const thesisId = card.dataset.thesis;
@@ -251,9 +271,11 @@ function bindThesisActions(reload) {
   });
 }
 
+// Αναιρεί μια αρχική ανάθεση που βρίσκεται ακόμη σε αναμονή επιτροπής.
 async function cancelInitialAssignment(thesisId, reload) {
   if (!confirm('Να αναιρεθεί η αρχική ανάθεση;')) return;
 
+  // POST: ζητά τη μετάβαση cancel_initial για τη συγκεκριμένη διπλωματική.
   await api('/api/thesis/transition', {
     method: 'POST',
     body: { thesisId, action: 'cancel_initial' },
@@ -262,7 +284,9 @@ async function cancelInitialAssignment(thesisId, reload) {
   await reload();
 }
 
+// Αλλάζει μια ενεργή διπλωματική σε κατάσταση «Υπό εξέταση».
 async function moveThesisUnderExam(thesisId, reload) {
+  // POST: ο επιβλέπων ζητά τη μετάβαση to_under_exam.
   await api('/api/thesis/transition', {
     method: 'POST',
     body: { thesisId, action: 'to_under_exam' },
@@ -271,7 +295,9 @@ async function moveThesisUnderExam(thesisId, reload) {
   await reload();
 }
 
+// Επιτρέπει στην τριμελή επιτροπή να καταχωρίσει βαθμούς.
 async function openThesisGrading(thesisId, reload) {
+  // POST: ενεργοποιεί τη βαθμολόγηση για τη συγκεκριμένη διπλωματική.
   await api('/api/thesis/transition', {
     method: 'POST',
     body: { thesisId, action: 'open_grading' },
@@ -280,6 +306,7 @@ async function openThesisGrading(thesisId, reload) {
   await reload();
 }
 
+// Δημιουργεί τη λίστα των ιδιωτικών σημειώσεων του διδάσκοντα.
 function privateNotesList(notes) {
   if (!notes.length) return empty('Δεν υπάρχουν σημειώσεις.');
 
@@ -289,13 +316,16 @@ function privateNotesList(notes) {
   return `<ul>${items}</ul>`;
 }
 
+// Φορτώνει από το backend μόνο τις σημειώσεις του τρέχοντος διδάσκοντα.
 async function showPrivateNotes(card, thesisId) {
+  // GET: ζητά τις ιδιωτικές σημειώσεις της συγκεκριμένης διπλωματικής.
   const data = await api(`/api/prof/theses/${thesisId}/notes`);
   const notesContainer = card.querySelector('[data-role="notes"]');
   notesContainer.hidden = false;
   notesContainer.innerHTML = privateNotesList(data.items);
 }
 
+// Αντιστοιχίζει το data-action του κουμπιού στην κατάλληλη ενέργεια.
 async function handleThesisCardAction(event, card, thesisId, reload) {
   const action = event.target.dataset.action;
   const actionHandlers = {
@@ -314,10 +344,12 @@ async function handleThesisCardAction(event, card, thesisId, reload) {
   }
 }
 
+// Αποθηκεύει μία ιδιωτική σημείωση που βλέπει μόνο ο δημιουργός της.
 async function addPrivateNote(event, thesisId) {
   event.preventDefault();
   const form = event.currentTarget;
   try {
+    // POST: στέλνει το κείμενο της σημείωσης για τη συγκεκριμένη διπλωματική.
     await api(`/api/prof/theses/${thesisId}/notes`, {
       method: 'POST',
       body: { text: form.text.value },
@@ -329,6 +361,7 @@ async function addPrivateNote(event, thesisId) {
   }
 }
 
+// Υποβάλλει τα τρία κριτήρια βαθμολόγησης και τα προαιρετικά σχόλια.
 async function submitGrade(event, thesisId, reload) {
   event.preventDefault();
   const form = event.currentTarget;
@@ -339,6 +372,7 @@ async function submitGrade(event, thesisId, reload) {
   };
 
   try {
+    // POST: στέλνει thesisId, σχόλια και τις τρεις επιμέρους βαθμολογίες.
     await api('/api/grades', {
       method: 'POST',
       body: { thesisId, comments: form.comments.value, criteria },
@@ -350,12 +384,14 @@ async function submitGrade(event, thesisId, reload) {
   }
 }
 
+// Ζητά οριστική ακύρωση ενεργής διπλωματικής μετά τη διετία.
 async function cancelActiveThesis(event, thesisId, reload) {
   event.preventDefault();
   const form = event.currentTarget;
   if (!confirm('Να ακυρωθεί οριστικά η διπλωματική;')) return;
 
   try {
+    // POST: στέλνει την πράξη ΓΣ και τον λόγο ακύρωσης.
     await api('/api/thesis/transition', {
       method: 'POST',
       body: {
@@ -373,6 +409,7 @@ async function cancelActiveThesis(event, thesisId, reload) {
   }
 }
 
+// Δημιουργεί την κάρτα μιας πρόσκλησης συμμετοχής στην τριμελή.
 function invitationCard(invitation) {
   return `<article class="card split" data-invitation="${escapeHtml(invitation.id)}">
     <div><h3>${escapeHtml(invitation.topic)}</h3><div class="meta-list"><span><strong>Φοιτητής:</strong> ${escapeHtml(invitation.student)}</span><span><strong>Επιβλέπων:</strong> ${escapeHtml(invitation.supervisor)}</span><span>${formatDate(invitation.createdAt)}</span></div></div>
@@ -380,12 +417,14 @@ function invitationCard(invitation) {
   </article>`;
 }
 
+// Στέλνει αποδοχή ή απόρριψη μιας πρόσκλησης.
 async function answerInvitation(event) {
   const action = event.target.dataset.action;
   if (!action) return;
 
   const invitationId = event.currentTarget.dataset.invitation;
   try {
+    // PATCH: στέλνει το id της πρόσκλησης και action accept ή decline.
     await api('/api/committee/invitations', {
       method: 'PATCH',
       body: { id: invitationId, action },
@@ -397,7 +436,9 @@ async function answerInvitation(event) {
   }
 }
 
+// Φορτώνει τις εκκρεμείς προσκλήσεις του συνδεδεμένου διδάσκοντα.
 async function invitations() {
+  // GET: παίρνει τις ενεργές προσκλήσεις τριμελούς από το backend.
   const data = await api('/api/committee/invitations');
   content().innerHTML = data.items.length
     ? data.items.map(invitationCard).join('')
@@ -408,7 +449,9 @@ async function invitations() {
   });
 }
 
+// Δημιουργεί μία ομάδα στατιστικών για επίβλεψη ή συμμετοχή σε τριμελή.
 function statsGroup(title, data) {
+  // Object.entries μετατρέπει το αντικείμενο counts σε ζεύγη [κατάσταση, πλήθος].
   const statusCounts = Object.entries(data.counts).map(([status, count]) => `
     <div class="status-count">
       <span>${escapeHtml(STATUS_LABELS[status] || status)}</span>
@@ -422,11 +465,14 @@ function statsGroup(title, data) {
   </div><div class="card section"><h3>Πλήθος ανά κατάσταση</h3><div class="status-count-list">${statusCounts}</div></div></section>`;
 }
 
+// Φορτώνει και εμφανίζει τα στατιστικά του διδάσκοντα.
 async function stats() {
+  // GET: παίρνει ξεχωριστά στατιστικά ως επιβλέπων και ως μέλος τριμελούς.
   const data = await api('/api/prof/stats');
   content().innerHTML = statsGroup('Ως επιβλέπων', data.supervised) + statsGroup('Ως μέλος τριμελούς', data.committee);
 }
 
+// Επιλέγει τη σωστή σελίδα διδάσκοντα από το page key του main.js.
 export async function renderProfessor(page) {
   const renderers = {
     'prof-dashboard': dashboard,

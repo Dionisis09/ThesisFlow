@@ -2,7 +2,9 @@ import { requireRole } from '../auth.js';
 import { currentProfessor, currentStudent, one, thesisData } from '../db.js';
 import { escapeHtml, isProfessorParticipant, validGradeCount } from './helpers.js';
 
+// Δημιουργεί το πλήρες εκτυπώσιμο HTML του πρακτικού εξέτασης.
 function examRecordHtml(thesis) {
+  // Το spread ενώνει τον επιβλέποντα με τα δύο μέλη σε μία λίστα επιτροπής.
   const committee = [
     { ...thesis.supervisor, committeeRole: 'Supervisor' },
     ...thesis.members.map((member) => ({ ...member, committeeRole: 'Committee member' })),
@@ -57,7 +59,9 @@ function examRecordHtml(thesis) {
 </html>`;
 }
 
+// Ελέγχει πρόσβαση και επιστρέφει πρακτικό μόνο όταν υπάρχουν τρεις βαθμοί.
 function showExamRecord(req, res) {
+  // Βρίσκει τη διπλωματική που ζητήθηκε στο URL.
   const thesis = one('SELECT * FROM Thesis WHERE id = ?', req.params.id);
   if (!thesis) return res.status(404).json({ error: 'Thesis not found.' });
 
@@ -80,6 +84,7 @@ function showExamRecord(req, res) {
   return res.type('html').send(examRecordHtml(thesisData(thesis.id)));
 }
 
+// Συνδέει το URL του πρακτικού με έλεγχο ρόλου και τον handler.
 export function registerExamRecordRoute(app) {
   app.get(
     '/api/theses/:id/exam-record',

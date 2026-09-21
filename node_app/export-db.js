@@ -10,10 +10,12 @@ const OUTPUT_FILES = [
   path.join(ROOT, 'database', 'thesisflow.sql'),
 ];
 
+// Προστατεύει ονόματα πινάκων και στηλών για χρήση μέσα σε SQL.
 function quoteIdentifier(value) {
   return `"${String(value).replaceAll('"', '""')}"`;
 }
 
+// Μετατρέπει κάθε JavaScript τιμή στην αντίστοιχη ασφαλή SQL μορφή.
 function sqlValue(value) {
   if (value === null || value === undefined) return 'NULL';
   if (typeof value === 'number') {
@@ -26,6 +28,7 @@ function sqlValue(value) {
 }
 
 const source = new DatabaseSync(SOURCE_DB);
+// Διαβάζει τους ορισμούς όλων των πινάκων από το εσωτερικό schema της SQLite.
 const tables = source.prepare(`
   SELECT name, sql
   FROM sqlite_master
@@ -55,6 +58,7 @@ for (const table of tables) {
 }
 
 for (const table of tables) {
+  // Εξάγει όλες τις γραμμές του τρέχοντος πίνακα με σταθερή σειρά.
   const tableName = quoteIdentifier(table.name);
   const rows = source.prepare(`SELECT * FROM ${tableName} ORDER BY rowid`).all();
   sourceCounts.set(table.name, rows.length);
@@ -83,7 +87,7 @@ for (const outputFile of OUTPUT_FILES) {
 }
 source.close();
 
-// Rebuild the database in memory to verify that the export is self-contained.
+// Ανακατασκευάζει τη βάση στη μνήμη για να αποδείξει ότι το SQL export είναι πλήρες.
 const restored = new DatabaseSync(':memory:');
 restored.exec(sql);
 const integrity = restored.prepare('PRAGMA integrity_check').get().integrity_check;
