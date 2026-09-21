@@ -90,10 +90,66 @@ async function updateTopic(event) {
   }
 }
 
+// Δημιουργεί τα κουμπιά ενός θέματος ανάλογα με το αν έχει ανατεθεί.
+function topicManagementActions(topic) {
+  if (topic.assigned) {
+    return '<span class="muted small">Το θέμα έχει ανατεθεί.</span>';
+  }
+
+  let toggleLabel = 'Δημοσίευση';
+  if (topic.status === 'AVAILABLE') toggleLabel = 'Απόκρυψη';
+
+  return `<button class="button button-secondary button-small" data-action="toggle">${toggleLabel}</button>
+    <input data-role="pdf" type="file" accept="application/pdf" class="compact-input">
+    <button class="button button-secondary button-small" data-action="upload">Ανέβασμα PDF</button>`;
+}
+
+// Δημιουργεί τη φόρμα επεξεργασίας μόνο για μη ανατεθειμένο θέμα.
+function topicEditForm(topic) {
+  if (topic.assigned) return '';
+
+  return `<details class="section"><summary>Επεξεργασία θέματος</summary>
+    <form data-role="edit-topic" class="stack section">
+      <label>Τίτλος<input name="title" value="${escapeHtml(topic.title)}" required></label>
+      <label>Σύνοψη<textarea name="summary" required>${escapeHtml(topic.summary)}</textarea></label>
+      <div><button class="button button-primary button-small">Αποθήκευση αλλαγών</button></div>
+    </form>
+  </details>`;
+}
+
+// Δημιουργεί μία πλήρη κάρτα θέματος χωρίς σύνθετα ternaries στο HTML.
+function topicCard(topic) {
+  let statusLabel = 'Κρυφό';
+  if (topic.status === 'AVAILABLE') statusLabel = 'Διαθέσιμο';
+
+  let descriptionLink = '';
+  if (topic.descriptionUrl) {
+    descriptionLink = `<a href="${escapeHtml(topic.descriptionUrl)}" target="_blank">PDF περιγραφής</a>`;
+  }
+
+  const actions = topicManagementActions(topic);
+  const editForm = topicEditForm(topic);
+  return `<article class="card" data-topic="${escapeHtml(topic.id)}">
+    <div class="split">
+      <div><h3>${escapeHtml(topic.title)}</h3><p class="topic-summary">${escapeHtml(topic.summary)}</p></div>
+      <span class="status">${statusLabel}</span>
+    </div>
+    <div class="inline">${descriptionLink}${actions}</div>
+    ${editForm}
+  </article>`;
+}
+
+// Δημιουργεί τη λίστα θεμάτων ή το μήνυμα κενής λίστας.
+function topicList(items) {
+  if (!items.length) return empty('Δεν υπάρχουν θέματα.');
+  return items.map(topicCard).join('');
+}
+
 // Φορτώνει τα θέματα από το backend και συνδέει τις φόρμες με τους handlers τους.
 async function topics() {
   // GET: παίρνει όλα τα θέματα του συνδεδεμένου διδάσκοντα.
   const data = await api('/api/prof/topics');
+  const topicItems = topicList(data.items);
   content().innerHTML = `
     <form id="topic-form" class="card form-grid">
       <label>Τίτλος<input name="title" maxlength="200" required></label>
@@ -101,19 +157,7 @@ async function topics() {
       <div class="full"><button class="button button-primary">Δημιουργία θέματος</button></div>
     </form>
     <section class="section"><h2 class="section-heading">Καταχωρισμένα θέματα</h2>
-      ${data.items.length ? data.items.map((topic) => `<article class="card" data-topic="${escapeHtml(topic.id)}">
-        <div class="split"><div><h3>${escapeHtml(topic.title)}</h3><p class="topic-summary">${escapeHtml(topic.summary)}</p></div><span class="status">${topic.status === 'AVAILABLE' ? 'Διαθέσιμο' : 'Κρυφό'}</span></div>
-        <div class="inline">
-          ${topic.descriptionUrl ? `<a href="${escapeHtml(topic.descriptionUrl)}" target="_blank">PDF περιγραφής</a>` : ''}
-          ${!topic.assigned ? `<button class="button button-secondary button-small" data-action="toggle">${topic.status === 'AVAILABLE' ? 'Απόκρυψη' : 'Δημοσίευση'}</button>
-          <input data-role="pdf" type="file" accept="application/pdf" class="compact-input"><button class="button button-secondary button-small" data-action="upload">Ανέβασμα PDF</button>` : '<span class="muted small">Το θέμα έχει ανατεθεί.</span>'}
-        </div>
-        ${!topic.assigned ? `<details class="section"><summary>Επεξεργασία θέματος</summary><form data-role="edit-topic" class="stack section">
-          <label>Τίτλος<input name="title" value="${escapeHtml(topic.title)}" required></label>
-          <label>Σύνοψη<textarea name="summary" required>${escapeHtml(topic.summary)}</textarea></label>
-          <div><button class="button button-primary button-small">Αποθήκευση αλλαγών</button></div>
-        </form></details>` : ''}
-      </article>`).join('') : empty('Δεν υπάρχουν θέματα.')}
+      ${topicItems}
     </section>`;
 
   document.querySelector('#topic-form').addEventListener('submit', createTopic);
@@ -126,7 +170,7 @@ async function topics() {
 }
 
 // Στέλνει το επιλεγμένο ζεύγος φοιτητή και θέματος για αρχική ανάθεση.
-async function submitAssignment(event, reloadChoices) {
+async function submitAssignment(event, searchForm) {
   event.preventDefault();
   const formData = new FormData(event.currentTarget);
   try {
@@ -139,10 +183,35 @@ async function submitAssignment(event, reloadChoices) {
       },
     });
     showMessage('Η αρχική ανάθεση ολοκληρώθηκε.');
-    await reloadChoices();
+    await renderAssignmentChoices(searchForm);
   } catch (error) {
     showMessage(error.message, 'error');
   }
+}
+
+// Δημιουργεί μία επιλογή διαθέσιμου φοιτητή.
+function studentAssignmentChoice(student) {
+  return `<label class="choice-row">
+    <input type="radio" name="studentId" value="${escapeHtml(student.id)}">
+    <span>${escapeHtml(student.am)} · ${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}</span>
+  </label>`;
+}
+
+// Δημιουργεί μία επιλογή διαθέσιμου θέματος.
+function topicAssignmentChoice(topic) {
+  return `<label class="choice-row">
+    <input type="radio" name="topicId" value="${escapeHtml(topic.id)}">
+    <span class="choice-copy">
+      <strong>${escapeHtml(topic.title)}</strong>
+      <span class="muted small">${escapeHtml(topic.summary)}</span>
+    </span>
+  </label>`;
+}
+
+// Επιστρέφει τις επιλογές ή μήνυμα όταν δεν υπάρχει διαθέσιμο αποτέλεσμα.
+function assignmentChoicesHtml(items, renderChoice, emptyMessage) {
+  if (!items.length) return empty(emptyMessage);
+  return items.map(renderChoice).join('');
 }
 
 // Ζητά και εμφανίζει μόνο τους διαθέσιμους φοιτητές και τα διαθέσιμα θέματα.
@@ -150,15 +219,30 @@ async function renderAssignmentChoices(searchForm) {
   const query = encodeURIComponent(searchForm.q.value);
   // GET: περνά το κείμενο αναζήτησης ως query parameter q.
   const data = await api(`/api/prof/assign?q=${query}`);
+
+  const studentChoices = assignmentChoicesHtml(
+    data.students,
+    studentAssignmentChoice,
+    'Δεν βρέθηκαν διαθέσιμοι φοιτητές.',
+  );
+  const topicChoices = assignmentChoicesHtml(
+    data.topics,
+    topicAssignmentChoice,
+    'Δεν βρέθηκαν διαθέσιμα θέματα.',
+  );
+
   document.querySelector('#assign-results').innerHTML = `<form id="assign-form" class="stack">
       <div class="grid grid-2">
-        <section class="card"><h2>Διαθέσιμοι φοιτητές</h2>${data.students.length ? data.students.map((student) => `<label class="choice-row"><input type="radio" name="studentId" value="${escapeHtml(student.id)}"><span>${escapeHtml(student.am)} · ${escapeHtml(student.firstName)} ${escapeHtml(student.lastName)}</span></label>`).join('') : empty('Δεν βρέθηκαν διαθέσιμοι φοιτητές.')}</section>
-        <section class="card"><h2>Διαθέσιμα θέματα</h2>${data.topics.length ? data.topics.map((topic) => `<label class="choice-row"><input type="radio" name="topicId" value="${escapeHtml(topic.id)}"><span class="choice-copy"><strong>${escapeHtml(topic.title)}</strong><span class="muted small">${escapeHtml(topic.summary)}</span></span></label>`).join('') : empty('Δεν βρέθηκαν διαθέσιμα θέματα.')}</section>
+        <section class="card"><h2>Διαθέσιμοι φοιτητές</h2>${studentChoices}</section>
+        <section class="card"><h2>Διαθέσιμα θέματα</h2>${topicChoices}</section>
       </div><div><button class="button button-success">Ανάθεση θέματος</button></div>
     </form>`;
-  document.querySelector('#assign-form').addEventListener('submit', (event) => {
-    submitAssignment(event, () => renderAssignmentChoices(searchForm));
-  });
+
+  async function handleAssignmentSubmit(event) {
+    await submitAssignment(event, searchForm);
+  }
+
+  document.querySelector('#assign-form').addEventListener('submit', handleAssignmentSubmit);
 }
 
 // Δημιουργεί τη σελίδα αρχικής ανάθεσης και ενεργοποιεί την αναζήτηση.
@@ -168,10 +252,12 @@ async function assign() {
   </form><div id="assign-results" class="section"></div>`;
 
   const searchForm = document.querySelector('#search-form');
-  searchForm.addEventListener('submit', (event) => {
+  function handleAssignmentSearch(event) {
     event.preventDefault();
     renderAssignmentChoices(searchForm).catch((error) => showMessage(error.message, 'error'));
-  });
+  }
+
+  searchForm.addEventListener('submit', handleAssignmentSearch);
   await renderAssignmentChoices(searchForm);
 }
 
@@ -206,25 +292,83 @@ function thesisActions(thesis) {
   return actions.join('');
 }
 
+// Δημιουργεί τον πίνακα προσκλήσεων μιας διπλωματικής.
+function thesisInvitationTable(thesis) {
+  if (!thesis.invitations?.length) return empty('Δεν υπάρχουν προσκλήσεις.');
+
+  const rows = thesis.invitations.map((invitation) => `<tr>
+    <td>${escapeHtml(invitation.professor.fullName)}<br><span class="muted small">${formatDate(invitation.createdAt)}</span></td>
+    <td>${escapeHtml(invitation.status)}</td>
+    <td>${formatDate(invitation.respondedAt)}</td>
+  </tr>`).join('');
+
+  return `<div class="table-wrap"><table>
+    <thead><tr><th>Πρόσκληση</th><th>Κατάσταση</th><th>Απάντηση</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+
+// Δημιουργεί το ιστορικό μεταβάσεων μιας διπλωματικής.
+function thesisHistoryList(thesis) {
+  if (!thesis.history?.length) return empty('Δεν υπάρχει ιστορικό.');
+
+  const items = thesis.history.map((historyItem) => `<li>
+    <strong>${escapeHtml(historyItem.toStatus)}</strong><br>
+    <span class="muted small">${formatDate(historyItem.createdAt)} · ${escapeHtml(historyItem.note || '')}</span>
+  </li>`).join('');
+  return `<ul class="timeline">${items}</ul>`;
+}
+
+// Επιστρέφει συνοπτικά τα στοιχεία της παρουσίασης ή παύλα.
+function thesisPresentationText(presentation) {
+  if (!presentation) return '—';
+  return `${escapeHtml(presentation.title)} · ${formatDate(presentation.date)} · ${escapeHtml(presentation.room)}`;
+}
+
+// Δημιουργεί τους διαθέσιμους συνδέσμους αρχείων και πρακτικού.
+function thesisResourceLinks(thesis, gradeCount) {
+  const links = [];
+  if (thesis.draftUrl) {
+    links.push(`<span><a href="${escapeHtml(thesis.draftUrl)}" target="_blank">Πρόχειρο PDF</a></span>`);
+  }
+  if (thesis.finalRepositoryUrl) {
+    links.push(`<span><a href="${escapeHtml(thesis.finalRepositoryUrl)}" target="_blank" rel="noreferrer">Τελικό κείμενο στη Νημερτή</a></span>`);
+  }
+
+  const hasExamRecord = ['UNDER_EXAM', 'COMPLETED'].includes(thesis.status) && gradeCount === 3;
+  if (hasExamRecord) {
+    links.push(`<span><a href="/api/theses/${escapeHtml(thesis.id)}/exam-record" target="_blank">Πρακτικό εξέτασης</a></span>`);
+  }
+  return links.join('');
+}
+
+// Εμφανίζει τις προσκλήσεις μόνο όσο η τριμελής δεν έχει ολοκληρωθεί.
+function thesisInvitationSection(thesis, invitations) {
+  if (thesis.status !== 'UNDER_ASSIGNMENT') return '';
+  return `<details class="section"><summary>Προσκλήσεις τριμελούς</summary>${invitations}</details>`;
+}
+
 // Μετατρέπει τα δεδομένα μιας διπλωματικής σε κάρτα του dashboard.
 function thesisCard(thesis) {
   const members = thesis.members?.map((member) => member.fullName).join(', ') || 'Δεν έχει συμπληρωθεί';
   const gradeCount = thesis.grades?.filter((item) => item.value >= 0 && item.value <= 10).length || 0;
-  const invitations = thesis.invitations?.length ? `<div class="table-wrap"><table><thead><tr><th>Πρόσκληση</th><th>Κατάσταση</th><th>Απάντηση</th></tr></thead><tbody>${thesis.invitations.map((item) => `<tr><td>${escapeHtml(item.professor.fullName)}<br><span class="muted small">${formatDate(item.createdAt)}</span></td><td>${escapeHtml(item.status)}</td><td>${formatDate(item.respondedAt)}</td></tr>`).join('')}</tbody></table></div>` : empty('Δεν υπάρχουν προσκλήσεις.');
-  const history = thesis.history?.length ? `<ul class="timeline">${thesis.history.map((item) => `<li><strong>${escapeHtml(item.toStatus)}</strong><br><span class="muted small">${formatDate(item.createdAt)} · ${escapeHtml(item.note || '')}</span></li>`).join('')}</ul>` : empty('Δεν υπάρχει ιστορικό.');
+  const invitations = thesisInvitationTable(thesis);
+  const invitationSection = thesisInvitationSection(thesis, invitations);
+  const history = thesisHistoryList(thesis);
+  const presentation = thesisPresentationText(thesis.presentation);
+  const resourceLinks = thesisResourceLinks(thesis, gradeCount);
+
   return `<article class="card" data-thesis="${escapeHtml(thesis.id)}">
     ${thesisSummary(thesis)}
     <div class="meta-list">
       <span><strong>Μέλη τριμελούς:</strong> ${escapeHtml(members)}</span>
-      <span><strong>Ανακοίνωση παρουσίασης:</strong> ${thesis.presentation ? `${escapeHtml(thesis.presentation.title)} · ${formatDate(thesis.presentation.date)} · ${escapeHtml(thesis.presentation.room)}` : '—'}</span>
+      <span><strong>Ανακοίνωση παρουσίασης:</strong> ${presentation}</span>
       <span><strong>Χρόνος από ανάθεση:</strong> ${escapeHtml(thesis.elapsedDays)} ημέρες</span>
       <span><strong>Τελικός βαθμός:</strong> ${thesis.finalGrade ?? '—'}</span>
-      ${thesis.draftUrl ? `<span><a href="${escapeHtml(thesis.draftUrl)}" target="_blank">Πρόχειρο PDF</a></span>` : ''}
-      ${thesis.finalRepositoryUrl ? `<span><a href="${escapeHtml(thesis.finalRepositoryUrl)}" target="_blank" rel="noreferrer">Τελικό κείμενο στη Νημερτή</a></span>` : ''}
-      ${['UNDER_EXAM', 'COMPLETED'].includes(thesis.status) && gradeCount === 3 ? `<span><a href="/api/theses/${escapeHtml(thesis.id)}/exam-record" target="_blank">Πρακτικό εξέτασης</a></span>` : ''}
+      ${resourceLinks}
     </div>
     <div class="inline section">${thesisActions(thesis)}</div>
-    ${thesis.status === 'UNDER_ASSIGNMENT' ? `<details class="section"><summary>Προσκλήσεις τριμελούς</summary>${invitations}</details>` : ''}
+    ${invitationSection}
     <details class="section"><summary>Χρονολόγιο ενεργειών</summary>${history}</details>
     <form data-role="note-form" class="inline section"><input class="compact-input" name="text" maxlength="300" placeholder="Ιδιωτική σημείωση"><button class="button button-secondary button-small">Προσθήκη</button><button type="button" class="button button-secondary button-small" data-action="notes">Οι σημειώσεις μου</button></form>
     <div data-role="notes" class="section" hidden></div>
@@ -244,7 +388,9 @@ async function theses() {
     // GET: ζητά τις διπλωματικές με φίλτρο κατάστασης και ρόλου.
     const data = await api(`/api/prof/theses?status=${status}&role=${role}`);
     const list = document.querySelector('#thesis-list');
-    list.innerHTML = data.items.length ? data.items.map(thesisCard).join('') : empty('Δεν βρέθηκαν διπλωματικές.');
+    let thesisCards = empty('Δεν βρέθηκαν διπλωματικές.');
+    if (data.items.length) thesisCards = data.items.map(thesisCard).join('');
+    list.innerHTML = thesisCards;
     bindThesisActions(load);
   };
   document.querySelector('#status-filter').addEventListener('change', load);
@@ -256,18 +402,23 @@ async function theses() {
 function bindThesisActions(reload) {
   content().querySelectorAll('[data-thesis]').forEach((card) => {
     const thesisId = card.dataset.thesis;
-    card.addEventListener('click', (event) => {
+    function handleCardClick(event) {
       handleThesisCardAction(event, card, thesisId, reload);
-    });
-    card.querySelector('[data-role="note-form"]')?.addEventListener('submit', (event) => {
+    }
+    function handleNoteSubmit(event) {
       addPrivateNote(event, thesisId);
-    });
-    card.querySelector('[data-role="grade-form"]')?.addEventListener('submit', (event) => {
+    }
+    function handleGradeSubmit(event) {
       submitGrade(event, thesisId, reload);
-    });
-    card.querySelector('[data-role="cancel-active"]')?.addEventListener('submit', (event) => {
+    }
+    function handleCancellationSubmit(event) {
       cancelActiveThesis(event, thesisId, reload);
-    });
+    }
+
+    card.addEventListener('click', handleCardClick);
+    card.querySelector('[data-role="note-form"]')?.addEventListener('submit', handleNoteSubmit);
+    card.querySelector('[data-role="grade-form"]')?.addEventListener('submit', handleGradeSubmit);
+    card.querySelector('[data-role="cancel-active"]')?.addEventListener('submit', handleCancellationSubmit);
   });
 }
 
@@ -440,9 +591,9 @@ async function answerInvitation(event) {
 async function invitations() {
   // GET: παίρνει τις ενεργές προσκλήσεις τριμελούς από το backend.
   const data = await api('/api/committee/invitations');
-  content().innerHTML = data.items.length
-    ? data.items.map(invitationCard).join('')
-    : empty('Δεν υπάρχουν ενεργές προσκλήσεις.');
+  let invitationCards = empty('Δεν υπάρχουν ενεργές προσκλήσεις.');
+  if (data.items.length) invitationCards = data.items.map(invitationCard).join('');
+  content().innerHTML = invitationCards;
 
   content().querySelectorAll('[data-invitation]').forEach((card) => {
     card.addEventListener('click', answerInvitation);
@@ -458,10 +609,13 @@ function statsGroup(title, data) {
       <strong>${count}</strong>
     </div>
   `).join('');
+  let completionTime = data.averageCompletionDays ?? '—';
+  if (data.averageCompletionDays != null) completionTime += ' ημ.';
+
   return `<section class="section"><h2 class="section-heading">${title}</h2><div class="grid grid-3">
     <div class="card metric"><span class="muted">Σύνολο</span><strong class="metric-value">${data.total}</strong></div>
     <div class="card metric"><span class="muted">Μέσος βαθμός</span><strong class="metric-value">${data.averageGrade ?? '—'}</strong></div>
-    <div class="card metric"><span class="muted">Μέσος χρόνος ολοκλήρωσης</span><strong class="metric-value">${data.averageCompletionDays ?? '—'}${data.averageCompletionDays != null ? ' ημ.' : ''}</strong></div>
+    <div class="card metric"><span class="muted">Μέσος χρόνος ολοκλήρωσης</span><strong class="metric-value">${completionTime}</strong></div>
   </div><div class="card section"><h3>Πλήθος ανά κατάσταση</h3><div class="status-count-list">${statusCounts}</div></div></section>`;
 }
 

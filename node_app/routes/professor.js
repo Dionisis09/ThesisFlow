@@ -86,7 +86,10 @@ function updateTopic(req, res) {
   }
 
   let { title, summary, status } = topic;
-  if (req.body?.toggle) status = status === 'AVAILABLE' ? 'HIDDEN' : 'AVAILABLE';
+  if (req.body?.toggle) {
+    if (status === 'AVAILABLE') status = 'HIDDEN';
+    else status = 'AVAILABLE';
+  }
   if (Object.hasOwn(req.body || {}, 'title')) {
     title = cleanText(req.body.title);
     if (!title) return res.status(400).json({ error: 'Invalid request.' });
@@ -124,13 +127,53 @@ function assignmentChoices(req, res) {
 
   const query = cleanText(req.query.q);
   const searchPattern = `%${query}%`;
+  let students;
+  let topics;
+
   // Τα LEFT JOIN με Thesis και ο έλεγχος NULL αποκλείουν ήδη ανατεθειμένες εγγραφές.
-  const students = query
-    ? all(`SELECT Student.* FROM Student LEFT JOIN Thesis ON Thesis.studentId = Student.id WHERE Thesis.id IS NULL AND (Student.am LIKE ? OR Student.firstName LIKE ? OR Student.lastName LIKE ?) ORDER BY Student.am LIMIT 20`, searchPattern, searchPattern, searchPattern)
-    : all('SELECT Student.* FROM Student LEFT JOIN Thesis ON Thesis.studentId = Student.id WHERE Thesis.id IS NULL ORDER BY Student.am LIMIT 20');
-  const topics = query
-    ? all(`SELECT Topic.* FROM Topic LEFT JOIN Thesis ON Thesis.topicId = Topic.id WHERE Topic.supervisorId = ? AND Topic.status = 'AVAILABLE' AND Thesis.id IS NULL AND (Topic.title LIKE ? OR Topic.summary LIKE ?) ORDER BY Topic.createdAt DESC LIMIT 20`, professor.id, searchPattern, searchPattern)
-    : all(`SELECT Topic.* FROM Topic LEFT JOIN Thesis ON Thesis.topicId = Topic.id WHERE Topic.supervisorId = ? AND Topic.status = 'AVAILABLE' AND Thesis.id IS NULL ORDER BY Topic.createdAt DESC LIMIT 20`, professor.id);
+  if (query) {
+    students = all(`
+      SELECT Student.*
+      FROM Student
+      LEFT JOIN Thesis ON Thesis.studentId = Student.id
+      WHERE Thesis.id IS NULL
+        AND (Student.am LIKE ? OR Student.firstName LIKE ? OR Student.lastName LIKE ?)
+      ORDER BY Student.am
+      LIMIT 20
+    `, searchPattern, searchPattern, searchPattern);
+
+    topics = all(`
+      SELECT Topic.*
+      FROM Topic
+      LEFT JOIN Thesis ON Thesis.topicId = Topic.id
+      WHERE Topic.supervisorId = ?
+        AND Topic.status = 'AVAILABLE'
+        AND Thesis.id IS NULL
+        AND (Topic.title LIKE ? OR Topic.summary LIKE ?)
+      ORDER BY Topic.createdAt DESC
+      LIMIT 20
+    `, professor.id, searchPattern, searchPattern);
+  } else {
+    students = all(`
+      SELECT Student.*
+      FROM Student
+      LEFT JOIN Thesis ON Thesis.studentId = Student.id
+      WHERE Thesis.id IS NULL
+      ORDER BY Student.am
+      LIMIT 20
+    `);
+
+    topics = all(`
+      SELECT Topic.*
+      FROM Topic
+      LEFT JOIN Thesis ON Thesis.topicId = Topic.id
+      WHERE Topic.supervisorId = ?
+        AND Topic.status = 'AVAILABLE'
+        AND Thesis.id IS NULL
+      ORDER BY Topic.createdAt DESC
+      LIMIT 20
+    `, professor.id);
+  }
 
   return res.json({
     students: students.map((student) => ({
@@ -173,6 +216,7 @@ function assignTopic(req, res) {
   try {
     // Δημιουργία Thesis και πρώτη εγγραφή ιστορικού γίνονται ατομικά.
     transaction(() => {
+      // Δημιουργεί νέα Thesis με αρχική κατάσταση UNDER_ASSIGNMENT.
       run(
         'INSERT INTO Thesis (id, studentId, supervisorId, topicId, status, createdAt, updatedAt, gradingOpen) VALUES (?, ?, ?, ?, ?, ?, ?, 0)',
         thesisId,
@@ -269,7 +313,10 @@ function professorStatistics(req, res) {
 function listCommitteeInvitations(req, res) {
   if (req.user.role === 'STUDENT') {
     const student = currentStudent(req.user.id);
-    const thesis = student ? one('SELECT id FROM Thesis WHERE studentId = ?', student.id) : null;
+    let thesis = null;
+    if (student) {
+      thesis = one('SELECT id FROM Thesis WHERE studentId = ?', student.id);
+    }
     if (!thesis) return res.json({ items: [] });
 
     // Ενώνει κάθε πρόσκληση με τα στοιχεία του προσκεκλημένου καθηγητή.
@@ -354,13 +401,16 @@ function answerCommitteeInvitation(req, res) {
     // Η απάντηση, η προσθήκη μέλους και η αλλαγή κατάστασης γίνονται ατομικά.
     transaction(() => {
       const timestamp = nowMs();
+      let committeeRole = 'MEMBER2';
+      if (currentMemberCount === 0) committeeRole = 'MEMBER1';
+
       run('UPDATE CommitteeInvitation SET status = ?, respondedAt = ? WHERE id = ?', 'ACCEPTED', timestamp, invitation.id);
       run(
         'INSERT INTO CommitteeMember (id, thesisId, professorId, role, createdAt) VALUES (?, ?, ?, ?, ?)',
         newId(),
         thesis.id,
         professor.id,
-        currentMemberCount === 0 ? 'MEMBER1' : 'MEMBER2',
+        committeeRole,
         timestamp,
       );
 
@@ -497,9 +547,10 @@ function saveGrade(req, res) {
     return res.status(409).json({ error: 'Grading has not been opened by the supervisor.' });
   }
 
-  let criteria = req.body?.criteria && typeof req.body.criteria === 'object'
-    ? req.body.criteria
-    : {};
+  let criteria = {};
+  if (req.body?.criteria && typeof req.body.criteria === 'object') {
+    criteria = req.body.criteria;
+  }
   let gradeValue;
   const criterionNames = ['written', 'presentation', 'overall'];
   const hasAllCriteria = criterionNames.every((name) => Object.hasOwn(criteria, name));
@@ -560,9 +611,11 @@ function saveGrade(req, res) {
   const validGrades = all('SELECT value FROM Grade WHERE thesisId = ?', thesis.id)
     .map((grade) => Number(grade.value))
     .filter((grade) => grade >= 0 && grade <= 10);
-  const finalGrade = validGrades.length === 3
-    ? Number((validGrades.reduce((sum, grade) => sum + grade, 0) / 3).toFixed(2))
-    : null;
+  let finalGrade = null;
+  if (validGrades.length === 3) {
+    const gradeSum = validGrades.reduce((sum, grade) => sum + grade, 0);
+    finalGrade = Number((gradeSum / 3).toFixed(2));
+  }
   return res.json({ ok: true, gradesReceived: validGrades.length, finalGrade });
 }
 

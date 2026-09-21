@@ -30,7 +30,10 @@ export function dashboardHero(label, title, description) {
 
 // Δημιουργεί μία επαναχρησιμοποιήσιμη κάρτα πλοήγησης.
 export function dashboardCard({ href, icon, title, description, tone = 'blue', external = false }) {
-  return `<a class="card dashboard-link dashboard-tone-${escapeHtml(tone)}" href="${escapeHtml(href)}"${external ? ' target="_blank" rel="noreferrer"' : ''}>
+  let externalAttributes = '';
+  if (external) externalAttributes = ' target="_blank" rel="noreferrer"';
+
+  return `<a class="card dashboard-link dashboard-tone-${escapeHtml(tone)}" href="${escapeHtml(href)}"${externalAttributes}>
     <span class="dashboard-icon" aria-hidden="true">${escapeHtml(icon)}</span>
     <span class="dashboard-card-copy">
       <strong>${escapeHtml(title)}</strong>
@@ -49,7 +52,8 @@ export function statusBadge(status) {
 export function formatDate(value) {
   if (!value) return '—';
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? escapeHtml(value) : date.toLocaleString('el-GR');
+  if (Number.isNaN(date.getTime())) return escapeHtml(value);
+  return date.toLocaleString('el-GR');
 }
 
 // Προσαρμόζει την ημερομηνία για input τύπου datetime-local.
@@ -79,8 +83,19 @@ export function empty(text) {
   return `<div class="empty">${escapeHtml(text)}</div>`;
 }
 
+// Μετατρέπει τον εσωτερικό ρόλο καθηγητή σε ελληνική ονομασία.
+function professorRoleLabel(role) {
+  if (role === 'SUPERVISOR') return 'Επιβλέπων';
+  return 'Μέλος τριμελούς';
+}
+
 // Δημιουργεί την κοινή σύνοψη μιας διπλωματικής για καθηγητή ή γραμματεία.
 export function thesisSummary(thesis) {
+  let roleHtml = '';
+  if (thesis.role) {
+    roleHtml = `<span><strong>Ρόλος:</strong> ${professorRoleLabel(thesis.role)}</span>`;
+  }
+
   return `
     <div class="split">
       <div>
@@ -92,6 +107,6 @@ export function thesisSummary(thesis) {
     <div class="meta-list">
       <span><strong>Φοιτητής:</strong> ${escapeHtml(thesis.student?.fullName)} (${escapeHtml(thesis.student?.am)})</span>
       <span><strong>Επιβλέπων:</strong> ${escapeHtml(thesis.supervisor?.fullName)}</span>
-      ${thesis.role ? `<span><strong>Ρόλος:</strong> ${thesis.role === 'SUPERVISOR' ? 'Επιβλέπων' : 'Μέλος τριμελούς'}</span>` : ''}
+      ${roleHtml}
     </div>`;
 }

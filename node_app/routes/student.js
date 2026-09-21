@@ -19,6 +19,12 @@ import {
   validGradeCount,
 } from './helpers.js';
 
+// Βρίσκει τη Thesis ενός φοιτητή ή επιστρέφει null αν δεν υπάρχει φοιτητής.
+function thesisForStudent(student) {
+  if (!student) return null;
+  return one('SELECT * FROM Thesis WHERE studentId = ?', student.id);
+}
+
 // Επιστρέφει τη διπλωματική του συνδεδεμένου φοιτητή με όλα τα αναλυτικά στοιχεία.
 function getStudentThesis(req, res) {
   const student = currentStudent(req.user.id);
@@ -26,6 +32,9 @@ function getStudentThesis(req, res) {
 
   // Αναζητά αν ο φοιτητής έχει ήδη εγγραφή Thesis.
   const thesis = one('SELECT id FROM Thesis WHERE studentId = ?', student.id);
+  let thesisDetails = null;
+  if (thesis) thesisDetails = thesisData(thesis.id);
+
   return res.json({
     student: {
       id: student.id,
@@ -34,7 +43,7 @@ function getStudentThesis(req, res) {
       lastName: student.lastName,
       fullName: `${student.firstName} ${student.lastName}`,
     },
-    thesis: thesis ? thesisData(thesis.id) : null,
+    thesis: thesisDetails,
   });
 }
 
@@ -89,10 +98,40 @@ function listProfessors(_req, res) {
   res.json({ items: professors });
 }
 
+// Αποθηκεύει μία πρόσκληση και επιστρέφει τα βασικά στοιχεία της.
+function saveCommitteeInvitation(thesis, professor) {
+  const invitation = one(
+    'SELECT * FROM CommitteeInvitation WHERE thesisId = ? AND professorId = ?',
+    thesis.id,
+    professor.id,
+  );
+  if (invitation?.status === 'ACCEPTED') return null;
+
+  const invitationId = invitation?.id || newId();
+  if (invitation) {
+    run(
+      'UPDATE CommitteeInvitation SET status = ?, createdAt = ?, respondedAt = NULL WHERE id = ?',
+      'PENDING',
+      nowMs(),
+      invitationId,
+    );
+  } else {
+    run(
+      'INSERT INTO CommitteeInvitation (id, thesisId, professorId, status, createdAt, respondedAt) VALUES (?, ?, ?, ?, ?, NULL)',
+      invitationId,
+      thesis.id,
+      professor.id,
+      'PENDING',
+      nowMs(),
+    );
+  }
+  return { id: invitationId, code: professor.code };
+}
+
 // Δημιουργεί ή επαναφέρει σε εκκρεμότητα τις προσκλήσεις τριμελούς.
 function createCommitteeInvitations(req, res) {
   const student = currentStudent(req.user.id);
-  const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
+  const thesis = thesisForStudent(student);
   if (!thesis) return res.status(400).json({ error: 'Invalid request.' });
   if (thesis.status !== 'UNDER_ASSIGNMENT') {
     return res.status(409).json({ error: 'Invalid request.' });
@@ -110,34 +149,12 @@ function createCommitteeInvitations(req, res) {
   if (!professors.length) return res.status(400).json({ error: 'Invalid request.' });
 
   // Η transaction εγγυάται ότι όλες οι προσκλήσεις αποθηκεύονται μαζί.
-  const createdInvitations = transaction(() => professors.flatMap((professor) => {
-    const invitation = one(
-      'SELECT * FROM CommitteeInvitation WHERE thesisId = ? AND professorId = ?',
-      thesis.id,
-      professor.id,
-    );
-    if (invitation?.status === 'ACCEPTED') return [];
-
-    const invitationId = invitation?.id || newId();
-    if (invitation) {
-      run(
-        'UPDATE CommitteeInvitation SET status = ?, createdAt = ?, respondedAt = NULL WHERE id = ?',
-        'PENDING',
-        nowMs(),
-        invitationId,
-      );
-    } else {
-      run(
-        'INSERT INTO CommitteeInvitation (id, thesisId, professorId, status, createdAt, respondedAt) VALUES (?, ?, ?, ?, ?, NULL)',
-        invitationId,
-        thesis.id,
-        professor.id,
-        'PENDING',
-        nowMs(),
-      );
-    }
-    return [{ id: invitationId, code: professor.code }];
-  }));
+  const createdInvitations = transaction(() => {
+    const savedInvitations = professors.map((professor) => (
+      saveCommitteeInvitation(thesis, professor)
+    ));
+    return savedInvitations.filter((invitation) => invitation !== null);
+  });
 
   return res.status(201).json({
     created: createdInvitations.map((invitation) => invitation.id),
@@ -149,7 +166,7 @@ function createCommitteeInvitations(req, res) {
 function uploadThesisDraft(uploadFolder) {
   return (req, res) => {
     const student = currentStudent(req.user.id);
-    const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
+    const thesis = thesisForStudent(student);
     if (!thesis) return res.status(400).json({ error: 'Invalid request.' });
     if (thesis.status !== 'UNDER_EXAM') {
       return res.status(409).json({ error: 'Thesis must be under examination.' });
@@ -166,7 +183,7 @@ function uploadThesisDraft(uploadFolder) {
 // Αποθηκεύει σύνδεσμο υποστηρικτικού υλικού για διπλωματική υπό εξέταση.
 function addThesisMaterial(req, res) {
   const student = currentStudent(req.user.id);
-  const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
+  const thesis = thesisForStudent(student);
   if (!thesis) return res.status(400).json({ error: 'Invalid request.' });
   if (thesis.status !== 'UNDER_EXAM') {
     return res.status(409).json({ error: 'Thesis must be under examination.' });
@@ -194,7 +211,7 @@ function addThesisMaterial(req, res) {
 // Δημιουργεί ή ενημερώνει τα στοιχεία παρουσίασης του φοιτητή.
 function savePresentation(req, res) {
   const student = currentStudent(req.user.id);
-  const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
+  const thesis = thesisForStudent(student);
   if (!thesis) return res.status(400).json({ error: 'Invalid request.' });
   if (thesis.status !== 'UNDER_EXAM') {
     return res.status(409).json({ error: 'Thesis must be under examination.' });
@@ -217,8 +234,12 @@ function savePresentation(req, res) {
   // Ελέγχει αν υπάρχει ήδη παρουσίαση ώστε να επιλέξει UPDATE ή INSERT.
   const existing = one('SELECT id FROM PresentationDetails WHERE thesisId = ?', thesis.id);
   const presentationId = existing?.id || newId();
-  const shownRoom = mode === 'IN_PERSON' ? room : 'Online';
-  const savedMeetingUrl = mode === 'ONLINE' ? meetingUrl : null;
+  let shownRoom = room;
+  let savedMeetingUrl = null;
+  if (mode === 'ONLINE') {
+    shownRoom = 'Online';
+    savedMeetingUrl = meetingUrl;
+  }
   const timestamp = nowMs();
 
   if (existing) {
@@ -252,7 +273,7 @@ function savePresentation(req, res) {
 // Αποθηκεύει το τελικό repository μόνο μετά από τρεις έγκυρους βαθμούς.
 function saveFinalRepository(req, res) {
   const student = currentStudent(req.user.id);
-  const thesis = student ? one('SELECT * FROM Thesis WHERE studentId = ?', student.id) : null;
+  const thesis = thesisForStudent(student);
   if (!thesis) return res.status(400).json({ error: 'Invalid request.' });
 
   if (thesis.status !== 'UNDER_EXAM' || validGradeCount(thesis.id) !== 3) {

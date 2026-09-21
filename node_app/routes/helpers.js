@@ -64,7 +64,8 @@ export function isProfessorParticipant(thesisId, professorId) {
 // Προστατεύει ειδικούς χαρακτήρες πριν δημιουργηθεί γραμμή CSV.
 export function csvEscape(value) {
   const raw = String(value ?? '');
-  return /[",\n\r]/.test(raw) ? `"${raw.replaceAll('"', '""')}"` : raw;
+  if (/[",\n\r]/.test(raw)) return `"${raw.replaceAll('"', '""')}"`;
+  return raw;
 }
 
 // Δέχεται κωδικούς καθηγητών και με μηδενικά και χωρίς αυτά, π.χ. P002 και P2.
@@ -88,9 +89,10 @@ export function statisticsForTheses(thesisIds) {
   const theses = thesisIds.map((id) => thesisData(id));
   const completedTheses = theses.filter((thesis) => thesis.status === 'COMPLETED');
 
-  const grades = completedTheses
-    .flatMap((thesis) => thesis.grades.map((grade) => Number(grade.value)))
-    .filter((grade) => grade >= 0 && grade <= 10);
+  const completedGradeLists = completedTheses.map((thesis) => thesis.grades);
+  const completedGrades = completedGradeLists.flat();
+  const numericGrades = completedGrades.map((grade) => Number(grade.value));
+  const grades = numericGrades.filter((grade) => grade >= 0 && grade <= 10);
 
   const completionDays = completedTheses.map((thesis) => {
     // Βρίσκει την αρχή ανάθεσης και το τέλος παρουσίασης για κάθε ολοκληρωμένη εργασία.

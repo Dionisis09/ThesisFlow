@@ -154,11 +154,13 @@ function updatePresentation(req, res) {
   if (!presentation) return res.status(404).json({ error: 'Presentation not found.' });
 
   const dateWasProvided = Object.hasOwn(req.body || {}, 'date');
-  const date = dateWasProvided ? datetimeToMs(req.body.date) : presentation.date;
+  let date = presentation.date;
+  if (dateWasProvided) date = datetimeToMs(req.body.date);
   if (!date) return res.status(400).json({ error: 'Invalid date.' });
 
   const roomWasProvided = Object.hasOwn(req.body || {}, 'room');
-  const room = roomWasProvided ? cleanText(req.body.room) : presentation.room;
+  let room = presentation.room;
+  if (roomWasProvided) room = cleanText(req.body.room);
   run(
     'UPDATE PresentationDetails SET date = ?, room = ?, updatedAt = ? WHERE id = ?',
     date,
@@ -175,8 +177,11 @@ function validatePeopleImport(body) {
     return { bodyError: 'A JSON object is required.' };
   }
 
-  const students = Array.isArray(body.students) ? body.students : [];
-  const professors = Array.isArray(body.professors) ? body.professors : [];
+  let students = [];
+  if (Array.isArray(body.students)) students = body.students;
+
+  let professors = [];
+  if (Array.isArray(body.professors)) professors = body.professors;
   const errors = [];
   students.forEach((row, index) => {
     const missingField = !row
@@ -333,7 +338,8 @@ async function importPeople(req, res) {
 
 // Ενημερώνει την ακαδημαϊκή κατάσταση φοιτητών με αντιστοίχιση στον ΑΜ.
 function importAcademicStatus(req, res) {
-  const rows = Array.isArray(req.body?.academic_status) ? req.body.academic_status : [];
+  let rows = [];
+  if (Array.isArray(req.body?.academic_status)) rows = req.body.academic_status;
   let updated = 0;
   const notFound = [];
   const errors = [];

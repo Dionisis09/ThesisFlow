@@ -47,7 +47,9 @@ export function createApp() {
     lastModified: true,
     setHeaders(res, filePath) {
       const longLived = ['.css', '.js', '.svg'].includes(path.extname(filePath).toLowerCase());
-      res.setHeader('Cache-Control', longLived ? 'public, max-age=3600, must-revalidate' : 'public, max-age=300');
+      let cacheControl = 'public, max-age=300';
+      if (longLived) cacheControl = 'public, max-age=3600, must-revalidate';
+      res.setHeader('Cache-Control', cacheControl);
     },
   }));
   app.use('/uploads', express.static(UPLOAD_FOLDER, {
@@ -59,7 +61,10 @@ export function createApp() {
     if (req.user) return res.redirect(roleHome(req.user.role));
     res.type('html').send(loginPage());
   });
-  app.get('/', (req, res) => res.redirect(req.user ? roleHome(req.user.role) : '/auth/login'));
+  app.get('/', (req, res) => {
+    if (req.user) return res.redirect(roleHome(req.user.role));
+    return res.redirect('/auth/login');
+  });
 
   for (const [route, pageDefinition] of Object.entries(PAGE_DEFINITIONS)) {
     // Το destructuring δίνει όνομα στα τρία στοιχεία κάθε ορισμού σελίδας.

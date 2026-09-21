@@ -9,7 +9,10 @@ function newCsrfToken() {
 // Διαβάζει τον χρήστη του session από τη βάση και τον τοποθετεί στο req.user.
 export function loadUser(req, _res, next) {
   // Αναζητά μόνο id, email και role του συνδεδεμένου χρήστη.
-  req.user = req.session?.userId ? one('SELECT id, email, role FROM User WHERE id = ?', req.session.userId) : null;
+  req.user = null;
+  if (req.session?.userId) {
+    req.user = one('SELECT id, email, role FROM User WHERE id = ?', req.session.userId);
+  }
   if (req.user && !req.session.csrfToken) req.session.csrfToken = newCsrfToken();
   next();
 }

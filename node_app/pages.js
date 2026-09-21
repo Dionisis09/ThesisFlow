@@ -81,6 +81,10 @@ export function workspacePage(user, title, pageKey, csrfToken) {
     '{{NAVIGATION}}': navigation,
     '{{PAGE_KEY}}': escapeHtml(pageKey),
   };
-  // reduce αντικαθιστά διαδοχικά κάθε placeholder μέσα στο ίδιο template.
-  return Object.entries(values).reduce((html, [token, value]) => html.replaceAll(token, value), WORKSPACE_HTML);
+  let html = WORKSPACE_HTML;
+  // Αντικαθιστά διαδοχικά κάθε placeholder μέσα στο ίδιο template.
+  for (const [token, value] of Object.entries(values)) {
+    html = html.replaceAll(token, value);
+  }
+  return html;
 }

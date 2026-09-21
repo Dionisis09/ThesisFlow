@@ -25,7 +25,8 @@ export function all(sql, ...params) {
 // Επιστρέφει μία γραμμή SELECT ή null όταν δεν βρεθεί αποτέλεσμα.
 export function one(sql, ...params) {
   const row = db.prepare(sql).get(...params);
-  return row ? { ...row } : null;
+  if (!row) return null;
+  return { ...row };
 }
 
 // Εκτελεί INSERT, UPDATE ή DELETE με δεσμευμένες παραμέτρους.
@@ -59,14 +60,19 @@ export function datetimeToMs(value) {
   if (value === null || value === undefined || value === '') return null;
   if (typeof value === 'number' && Number.isFinite(value)) return value;
   const numeric = Number(value);
-  if (Number.isFinite(numeric) && numeric > 0) return numeric < 10_000_000_000 ? numeric * 1000 : numeric;
+  if (Number.isFinite(numeric) && numeric > 0) {
+    if (numeric < 10_000_000_000) return numeric * 1000;
+    return numeric;
+  }
   const parsed = Date.parse(String(value));
-  return Number.isFinite(parsed) ? parsed : null;
+  if (Number.isFinite(parsed)) return parsed;
+  return null;
 }
 
 export function msToIso(value) {
   const ms = datetimeToMs(value);
-  return ms === null ? null : new Date(ms).toISOString();
+  if (ms === null) return null;
+  return new Date(ms).toISOString();
 }
 
 // Ελέγχει ότι μία τιμή είναι πλήρες HTTP ή HTTPS URL.
@@ -134,9 +140,10 @@ function gradeData(grade) {
 
 // Συνθέτει το αντικείμενο API μιας διπλωματικής από τους κανονικοποιημένους πίνακες.
 export function thesisData(thesisOrId, viewerProfessorId = null, detailed = true) {
-  const thesis = typeof thesisOrId === 'string'
-    ? one('SELECT * FROM Thesis WHERE id = ?', thesisOrId)
-    : thesisOrId;
+  let thesis = thesisOrId;
+  if (typeof thesisOrId === 'string') {
+    thesis = one('SELECT * FROM Thesis WHERE id = ?', thesisOrId);
+  }
   if (!thesis) return null;
 
   const student = one('SELECT * FROM Student WHERE id = ?', thesis.studentId);
@@ -154,7 +161,8 @@ export function thesisData(thesisOrId, viewerProfessorId = null, detailed = true
   `, thesis.id);
   // map μετατρέπει κάθε γραμμή Grade στη μορφή που χρειάζεται το frontend.
   const grades = gradeRows.map(gradeData);
-  const validGrades = grades.map((item) => Number(item.value)).filter((value) => value >= 0 && value <= 10);
+  const numericGrades = grades.map((item) => Number(item.value));
+  const validGrades = numericGrades.filter((value) => value >= 0 && value <= 10);
   const presentation = one('SELECT * FROM PresentationDetails WHERE thesisId = ?', thesis.id);
   const start = datetimeToMs(thesis.officialAssignedAt) ?? datetimeToMs(thesis.createdAt) ?? nowMs();
   const elapsedDays = Math.max(0, Math.floor((nowMs() - start) / 86_400_000));
@@ -162,6 +170,13 @@ export function thesisData(thesisOrId, viewerProfessorId = null, detailed = true
   let role = null;
   if (viewerProfessorId === thesis.supervisorId) role = 'SUPERVISOR';
   else if (memberRows.some((member) => member.id === viewerProfessorId)) role = 'COMMITTEE_MEMBER';
+
+  let finalGrade = null;
+  // Υπολογίζει τελικό βαθμό μόνο όταν υπάρχουν ακριβώς τρεις έγκυροι βαθμοί.
+  if (validGrades.length === 3) {
+    const gradeSum = validGrades.reduce((sum, value) => sum + value, 0);
+    finalGrade = Math.round((gradeSum / 3) * 100) / 100;
+  }
 
   const result = {
     id: thesis.id,
@@ -177,10 +192,7 @@ export function thesisData(thesisOrId, viewerProfessorId = null, detailed = true
     draftUrl: thesis.draftUrl,
     finalRepositoryUrl: thesis.finalRepositoryUrl,
     gradingOpen: Boolean(thesis.gradingOpen),
-    // Υπολογίζει τελικό βαθμό μόνο όταν υπάρχουν ακριβώς τρεις έγκυροι βαθμοί.
-    finalGrade: validGrades.length === 3
-      ? Math.round((validGrades.reduce((sum, value) => sum + value, 0) / 3) * 100) / 100
-      : null,
+    finalGrade,
     student: {
       id: student.id,
       am: student.am,

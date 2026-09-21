@@ -196,6 +196,42 @@ function finalRepositoryForm(thesis, gradeCount) {
   return `<form id="repository-form" class="inline section"><input class="compact-input" name="url" type="url" placeholder="Σύνδεσμος Νημερτή" required><button class="button button-primary">Καταχώριση τελικού κειμένου</button></form>`;
 }
 
+// Επιστρέφει σύνδεσμο για το πρόχειρο PDF ή παύλα όταν δεν υπάρχει.
+function draftLink(thesis) {
+  if (!thesis.draftUrl) return '—';
+  return `<a href="${escapeHtml(thesis.draftUrl)}" target="_blank">Προβολή PDF</a>`;
+}
+
+// Επιστρέφει σύνδεσμο Νημερτή ή παύλα όταν δεν έχει καταχωριστεί.
+function finalRepositoryLink(thesis) {
+  if (!thesis.finalRepositoryUrl) return '—';
+  return `<a href="${escapeHtml(thesis.finalRepositoryUrl)}" target="_blank" rel="noreferrer">Νημερτής</a>`;
+}
+
+// Δημιουργεί τη λίστα της τριμελούς και επισημαίνει το πρώτο μέλος ως επιβλέποντα.
+function committeeMemberList(members) {
+  return members.map((member, index) => {
+    let role = '';
+    if (index === 0) role = ' (επιβλέπων)';
+    return `<li>${escapeHtml(member.fullName)}${role}</li>`;
+  }).join('');
+}
+
+// Εμφανίζει τα στοιχεία παρουσίασης ή ενημερωτικό μήνυμα όταν δεν υπάρχουν.
+function presentationDetails(presentation) {
+  if (!presentation) return '<p class="muted">Δεν έχουν οριστεί στοιχεία.</p>';
+
+  let location = presentation.room;
+  if (presentation.mode === 'ONLINE') location = 'Διαδικτυακά';
+  return `<p><strong>${formatDate(presentation.date)}</strong></p><p>${escapeHtml(location)}</p>`;
+}
+
+// Εμφανίζει το πρακτικό εξέτασης μόνο όταν υπάρχουν και οι τρεις βαθμοί.
+function examRecordLink(thesis, gradeCount) {
+  if (gradeCount !== 3) return '';
+  return `<p class="section"><a href="/api/theses/${escapeHtml(thesis.id)}/exam-record" target="_blank">Πρακτικό εξέτασης</a></p>`;
+}
+
 // Φορτώνει και εμφανίζει ολόκληρη την τρέχουσα διπλωματική του φοιτητή.
 async function studentThesis() {
   // GET: παίρνει τη διπλωματική μαζί με επιτροπή, βαθμούς, υλικό και ιστορικό.
@@ -211,6 +247,11 @@ async function studentThesis() {
   const materials = thesisMaterials(thesis);
   const gradeCount = validGradeCount(thesis);
   const repositoryForm = finalRepositoryForm(thesis, gradeCount);
+  const draft = draftLink(thesis);
+  const finalRepository = finalRepositoryLink(thesis);
+  const committeeMembers = committeeMemberList(members);
+  const presentation = presentationDetails(thesis.presentation);
+  const examRecord = examRecordLink(thesis, gradeCount);
 
   content().innerHTML = `
     <section class="card">
@@ -220,16 +261,16 @@ async function studentThesis() {
         <div><dt>Επιβλέπων</dt><dd>${escapeHtml(thesis.supervisor.fullName)}</dd></div>
         <div><dt>Οριστική ανάθεση</dt><dd>${formatDate(thesis.officialAssignedAt)}<br><span class="muted small">${escapeHtml(thesis.elapsedDays)} ημέρες</span></dd></div>
         <div><dt>Τελικός βαθμός</dt><dd>${thesis.finalGrade ?? '—'}</dd></div>
-        <div><dt>Πρόχειρο</dt><dd>${thesis.draftUrl ? `<a href="${escapeHtml(thesis.draftUrl)}" target="_blank">Προβολή PDF</a>` : '—'}</dd></div>
-        <div><dt>Τελικό κείμενο</dt><dd>${thesis.finalRepositoryUrl ? `<a href="${escapeHtml(thesis.finalRepositoryUrl)}" target="_blank" rel="noreferrer">Νημερτής</a>` : '—'}</dd></div>
+        <div><dt>Πρόχειρο</dt><dd>${draft}</dd></div>
+        <div><dt>Τελικό κείμενο</dt><dd>${finalRepository}</dd></div>
       </dl>
       ${repositoryForm}
     </section>
     <section class="grid grid-2 section">
-      <div class="card"><h2 class="section-heading">Τριμελής επιτροπή</h2><ul>${members.map((member, index) => `<li>${escapeHtml(member.fullName)} ${index === 0 ? '(επιβλέπων)' : ''}</li>`).join('')}</ul></div>
-      <div class="card"><h2 class="section-heading">Παρουσίαση</h2>${thesis.presentation ? `<p><strong>${formatDate(thesis.presentation.date)}</strong></p><p>${escapeHtml(thesis.presentation.mode === 'ONLINE' ? 'Διαδικτυακά' : thesis.presentation.room)}</p>` : '<p class="muted">Δεν έχουν οριστεί στοιχεία.</p>'}</div>
+      <div class="card"><h2 class="section-heading">Τριμελής επιτροπή</h2><ul>${committeeMembers}</ul></div>
+      <div class="card"><h2 class="section-heading">Παρουσίαση</h2>${presentation}</div>
     </section>
-    <section class="card section"><h2 class="section-heading">Βαθμολογία</h2>${gradeRows(thesis)}${gradeCount === 3 ? `<p class="section"><a href="/api/theses/${escapeHtml(thesis.id)}/exam-record" target="_blank">Πρακτικό εξέτασης</a></p>` : ''}</section>
+    <section class="card section"><h2 class="section-heading">Βαθμολογία</h2>${gradeRows(thesis)}${examRecord}</section>
     <section class="grid grid-2 section">
       <div class="card"><h2 class="section-heading">Ιστορικό</h2>${history}</div>
       <div class="card"><h2 class="section-heading">Υποστηρικτικό υλικό</h2>${materials}</div>
@@ -292,6 +333,11 @@ async function invitations() {
   const invitationItems = invitationData.items || [];
   const choices = availableProfessorChoices(professorData.items, thesis, invitationItems);
   const canInvite = thesis.status === 'UNDER_ASSIGNMENT';
+  let invitationProgress = empty('Δεν υπάρχουν προσκλήσεις.');
+  if (invitationItems.length) {
+    invitationProgress = invitationItems.map(invitationProgressCard).join('');
+  }
+
   content().innerHTML = `
     <section class="card">
       <div class="split"><h2>Επιλογή διδασκόντων</h2>${statusBadge(thesis.status)}</div>
@@ -301,7 +347,7 @@ async function invitations() {
       </form>` : '<p class="muted">Η τριμελής έχει οριστικοποιηθεί.</p>'}
     </section>
     <section class="section"><h2 class="section-heading">Πορεία προσκλήσεων</h2>
-      ${invitationItems.length ? invitationItems.map(invitationProgressCard).join('') : empty('Δεν υπάρχουν προσκλήσεις.')}
+      ${invitationProgress}
     </section>`;
   document.querySelector('#invite-form')?.addEventListener('submit', sendCommitteeInvitations);
 }
@@ -318,6 +364,11 @@ async function upload() {
     content().innerHTML = empty('Τα αρχεία και οι σύνδεσμοι ενεργοποιούνται όταν ο επιβλέπων θέσει τη διπλωματική σε κατάσταση «Υπό εξέταση».');
     return;
   }
+  let currentDraftLink = '';
+  if (thesis.draftUrl) {
+    currentDraftLink = `<a href="${escapeHtml(thesis.draftUrl)}" target="_blank">Τρέχον πρόχειρο</a>`;
+  }
+
   content().innerHTML = `
     <div class="grid grid-2">
       <form id="draft-form" class="card stack">
@@ -325,7 +376,7 @@ async function upload() {
         <p class="muted small">Έγκυρο PDF έως 12 MB για διπλωματική υπό εξέταση.</p>
         <input name="file" type="file" accept="application/pdf" required>
         <button class="button button-primary">Ανέβασμα PDF</button>
-        ${thesis.draftUrl ? `<a href="${escapeHtml(thesis.draftUrl)}" target="_blank">Τρέχον πρόχειρο</a>` : ''}
+        ${currentDraftLink}
       </form>
       <form id="material-form" class="card stack">
         <h2>Υποστηρικτικό υλικό</h2>
@@ -351,9 +402,16 @@ async function presentation() {
     return;
   }
   const item = thesis.presentation || {};
+  let inPersonSelected = 'selected';
+  let onlineSelected = '';
+  if (item.mode === 'ONLINE') {
+    inPersonSelected = '';
+    onlineSelected = 'selected';
+  }
+
   content().innerHTML = `<form id="presentation-form" class="card form-grid">
     <label>Ημερομηνία και ώρα<input name="date" type="datetime-local" value="${toLocalInput(item.date)}" required></label>
-    <label>Τρόπος παρουσίασης<select name="mode"><option value="IN_PERSON" ${item.mode !== 'ONLINE' ? 'selected' : ''}>Δια ζώσης</option><option value="ONLINE" ${item.mode === 'ONLINE' ? 'selected' : ''}>Διαδικτυακά</option></select></label>
+    <label>Τρόπος παρουσίασης<select name="mode"><option value="IN_PERSON" ${inPersonSelected}>Δια ζώσης</option><option value="ONLINE" ${onlineSelected}>Διαδικτυακά</option></select></label>
     <label class="full">Τίτλος ανακοίνωσης<input name="title" value="${escapeHtml(item.title || `Παρουσίαση: ${thesis.topic.title}`)}" required></label>
     <label id="room-field">Αίθουσα<input name="room" value="${escapeHtml(item.room || '')}"></label>
     <label id="meeting-field">Σύνδεσμος τηλεδιάσκεψης<input name="meetingUrl" type="url" value="${escapeHtml(item.meetingUrl || '')}"></label>

@@ -39,10 +39,12 @@ function managementControls(thesis) {
   if (thesis.status === 'UNDER_EXAM') {
     const validGrades = thesis.grades?.filter((grade) => grade.value >= 0 && grade.value <= 10);
     const readyToComplete = validGrades?.length === 3 && thesis.finalRepositoryUrl;
-    const disabledAttribute = readyToComplete ? '' : 'disabled';
-    const requirementMessage = readyToComplete
-      ? ''
-      : '<span class="muted small">Απαιτούνται 3 βαθμοί και σύνδεσμος Νημερτή.</span>';
+    let disabledAttribute = 'disabled';
+    let requirementMessage = '<span class="muted small">Απαιτούνται 3 βαθμοί και σύνδεσμος Νημερτή.</span>';
+    if (readyToComplete) {
+      disabledAttribute = '';
+      requirementMessage = '';
+    }
     blocks.push(`<button class="button button-success button-small" data-action="complete" ${disabledAttribute}>Περάτωση</button>${requirementMessage}`);
   }
   return blocks.join('');
@@ -50,13 +52,21 @@ function managementControls(thesis) {
 
 // Μετατρέπει μία διπλωματική σε κάρτα διαχείρισης της γραμματείας.
 function adminThesisCard(thesis) {
+  let presentationDate = '—';
+  if (thesis.presentation) presentationDate = formatDate(thesis.presentation.date);
+
+  let repositoryLink = '—';
+  if (thesis.finalRepositoryUrl) {
+    repositoryLink = `<a href="${escapeHtml(thesis.finalRepositoryUrl)}" target="_blank">Νημερτής</a>`;
+  }
+
   return `<article class="card" data-thesis="${escapeHtml(thesis.id)}">
     ${thesisSummary(thesis)}
     <div class="meta-list">
       <span><strong>Τριμελής:</strong> ${escapeHtml(thesis.members?.map((member) => member.fullName).join(', ') || '—')}</span>
-      <span><strong>Παρουσίαση:</strong> ${thesis.presentation ? formatDate(thesis.presentation.date) : '—'}</span>
+      <span><strong>Παρουσίαση:</strong> ${presentationDate}</span>
       <span><strong>Χρόνος από ανάθεση:</strong> ${escapeHtml(thesis.elapsedDays)} ημέρες</span>
-      <span><strong>Βαθμοί:</strong> ${thesis.grades?.length || 0}/3 · <strong>Τελικό κείμενο:</strong> ${thesis.finalRepositoryUrl ? `<a href="${escapeHtml(thesis.finalRepositoryUrl)}" target="_blank">Νημερτής</a>` : '—'}</span>
+      <span><strong>Βαθμοί:</strong> ${thesis.grades?.length || 0}/3 · <strong>Τελικό κείμενο:</strong> ${repositoryLink}</span>
     </div>
     <div class="stack section">${managementControls(thesis)}</div>
   </article>`;
@@ -72,7 +82,9 @@ async function theses() {
     // GET: ζητά τις διπλωματικές της επιλεγμένης κατάστασης.
     const data = await api(`/api/admin/theses?status=${selectedStatus}`);
     const list = document.querySelector('#admin-thesis-list');
-    list.innerHTML = data.items.length ? data.items.map(adminThesisCard).join('') : empty('Δεν βρέθηκαν διπλωματικές.');
+    let thesisCards = empty('Δεν βρέθηκαν διπλωματικές.');
+    if (data.items.length) thesisCards = data.items.map(adminThesisCard).join('');
+    list.innerHTML = thesisCards;
     bindManagement(load);
   };
   document.querySelector('#status-filter').addEventListener('change', load);
@@ -180,12 +192,18 @@ async function updatePresentation(event) {
 async function presentations() {
   // GET: παίρνει τις παρουσιάσεις μαζί με τα στοιχεία των διπλωματικών.
   const data = await api('/api/admin/presentations');
-  content().innerHTML = data.items.length ? data.items.map((item) => `<form class="card form-grid" data-presentation="${escapeHtml(item.id)}">
+
+  let presentationForms = empty('Δεν υπάρχουν παρουσιάσεις.');
+  if (data.items.length) {
+    presentationForms = data.items.map((item) => `<form class="card form-grid" data-presentation="${escapeHtml(item.id)}">
     <div class="full split"><div><h3>${escapeHtml(item.thesis.topic.title)}</h3><p class="muted">${escapeHtml(item.thesis.student.fullName)} · ${escapeHtml(item.thesis.supervisor.fullName)}</p></div>${statusBadge(item.thesis.status)}</div>
     <label>Ημερομηνία και ώρα<input name="date" type="datetime-local" value="${toLocalInput(item.date)}" required></label>
     <label>Αίθουσα<input name="room" value="${escapeHtml(item.room)}"></label>
     <div class="full"><button class="button button-primary button-small">Αποθήκευση</button></div>
-  </form>`).join('') : empty('Δεν υπάρχουν παρουσιάσεις.');
+  </form>`).join('');
+  }
+
+  content().innerHTML = presentationForms;
   content().querySelectorAll('[data-presentation]').forEach((form) => {
     form.addEventListener('submit', updatePresentation);
   });

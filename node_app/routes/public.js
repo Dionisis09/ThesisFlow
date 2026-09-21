@@ -3,8 +3,11 @@ import { escapeXml } from './helpers.js';
 
 // Επιστρέφει τις δημόσιες παρουσιάσεις σε JSON ή XML με προαιρετικό εύρος ημερομηνιών.
 function publicPresentations(req, res) {
-  const fromMs = req.query.from ? datetimeToMs(req.query.from) : null;
-  const toMs = req.query.to ? datetimeToMs(req.query.to) : null;
+  let fromMs = null;
+  if (req.query.from) fromMs = datetimeToMs(req.query.from);
+
+  let toMs = null;
+  if (req.query.to) toMs = datetimeToMs(req.query.to);
   if (req.query.from && fromMs === null) return res.status(400).json({ error: 'Invalid request.' });
   if (req.query.to && toMs === null) return res.status(400).json({ error: 'Invalid request.' });
 
@@ -19,7 +22,8 @@ function publicPresentations(req, res) {
     parameters.push(toMs);
   }
 
-  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  let whereClause = '';
+  if (conditions.length) whereClause = `WHERE ${conditions.join(' AND ')}`;
   // Ενώνει παρουσίαση, διπλωματική, φοιτητή, θέμα και επιβλέποντα σε ένα αποτέλεσμα.
   const rows = all(`
     SELECT PresentationDetails.*, Thesis.id AS thesisId, Student.am, Student.firstName AS studentFirst,

@@ -19,9 +19,16 @@ export async function api(url, options = {}) {
   // Εκτελεί το HTTP request προς το αντίστοιχο route του backend.
   const response = await fetch(url, { ...options, method, body, headers });
   const contentType = response.headers.get('content-type') || '';
-  const payload = contentType.includes('json') ? await response.json().catch(() => ({})) : await response.text();
+  let payload;
+  if (contentType.includes('json')) {
+    payload = await response.json().catch(() => ({}));
+  } else {
+    payload = await response.text();
+  }
+
   if (!response.ok) {
-    const message = typeof payload === 'object' ? payload.error : payload;
+    let message = payload;
+    if (typeof payload === 'object') message = payload.error;
     throw new Error(message || `Σφάλμα ${response.status}`);
   }
   return payload;
